@@ -20,6 +20,7 @@ int main( int argc, char** argv ) {
     triforce::Graph graph;
     graph.Load(argv[1], 1);
     triforce::Cover cover(graph);
+    cover.RefineCommunities();
     std::cout << "Score: " << triforce::Score(cover) << std::endl;
     std::cout << "Number of communities: " << cover.NumCommunities() << std::endl;
     return 0;

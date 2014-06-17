@@ -13,6 +13,7 @@
   */
 
 #include "cover.h"
+#include "cover_utils.h"
 #include "graph.h"
 #include "graph_utils.h"
 #include <algorithm>
@@ -42,6 +43,7 @@ namespace triforce {
     }
 
     Cover::~Cover() {
+        Clear();
         for(long i = 0; i < m_Graph.GetNumNodes(); ++i ) { 
             delete m_NodeCommunities[i];
         }
@@ -86,17 +88,78 @@ namespace triforce {
                 Community* community = new Community( *this, nextLabel );
                 m_Communities.push_back(community);
                 community->Add(nodeId);
-                m_NodeCommunities[nodeId]->insert(community->Id());
+//                m_NodeCommunities[nodeId]->insert(community->Id());
                 const  long* adjacencies = m_Graph.GetNeighbors(nodeId);
                 long degree = m_Graph.GetDegree(nodeId);
                 for( long j = 0; j < degree; ++j ) { 
                     visited[adjacencies[j]] = true;
-                    m_NodeCommunities[adjacencies[j]]->insert(nextLabel);
+ //                   m_NodeCommunities[adjacencies[j]]->insert(nextLabel);
                     community->Add(adjacencies[j]);
                 }   
                 nextLabel++;
             }   
         }   
+    }
+
+
+    void Cover::Clear() {
+        for(long i = 0; i < m_Graph.GetNumNodes(); ++i ) { 
+            m_NodeCommunities[i]->clear();
+        }
+        m_Communities.clear();
+        m_CommunityMatrix.Clear();
+    }
+
+    long* Cover::Serialize( long& arraySize ) {
+        arraySize = 0;
+        long size = m_Communities.size();
+        for( long i = 0; i < size; ++i ) {
+            arraySize+=m_Communities[i]->Size()+1;
+        }
+
+        long* array = new long[arraySize];
+        long j = 0;
+        for( long i = 0; i < size; ++i ) {
+            array[j++] = m_Communities[i]->Size();
+            const std::set<long>& nodes = m_Communities[i]->Nodes();
+            for( auto it = nodes.begin(); it != nodes.end(); ++it, ++j ) {
+                array[j] = *it;
+            }
+        }
+        return array;
+    }
+
+    void Cover::Deserialize( long* array , long size) {
+        Clear();
+        long nextLabel = 0;
+        for( long i = 0; i < size; ) {
+          Community* community = new Community(*this, nextLabel++);
+          long limit = ++i + array[i];
+          for(; i < limit; ++i) {
+              m_Communities.push_back(community);
+              community->Add(array[i]);
+          }  
+        } 
+    }
+
+    void Cover::RefineCommunities() {
+        bool improve = true;
+        long bestCoverSize = 0;
+        long* bestCover = Serialize( bestCoverSize );
+        double bestScore = Score(*this);
+        while(improve) {
+            improve = false;
+            //Compute new cover.
+            double newScore = Score(*this);
+            if( newScore > bestScore ) {
+                delete [] bestCover;
+                bestCover = Serialize( bestCoverSize );
+                bestScore = newScore;
+                improve = true;
+            }
+        }        
+        Deserialize(bestCover, bestCoverSize);
+        delete [] bestCover;
     }
 }
 
