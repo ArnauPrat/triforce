@@ -17,13 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define COVER_H
 
 #include "sparse_matrix.h"
+#include "graph.h"
 #include <set>
 #include <vector>
 
 namespace triforce {
-
     
-    class Graph; //forward declaration.
 
     class Cover {
         public: 
@@ -41,45 +40,122 @@ namespace triforce {
                     /** @brief Adds a node into the community.
                      *  @param nodeId The node to add.*/
                     inline void Add( long nodeId ) {
+                        assert(!Contains(nodeId));
                         m_Nodes.insert( nodeId );
                         m_Cover.m_NodeCommunities[nodeId]->insert(m_Id);
-                        const std::set<long>& communities = m_Cover.NodeCommunities(nodeId);
+                        const Graph& graph = GetGraph();
+                        long degree = graph.GetDegree( nodeId );
+                        const long* adjacencies = graph.GetNeighbors( nodeId );
+                        for( long i = 0; i < degree; ++i ) {
+                            if( Contains(adjacencies[i]) ) {
+                                m_Kin[adjacencies[i]]++;
+                                m_InternalEdges++;
+                                m_ExternalEdges--;
+                            } else {
+                                m_ExternalEdges++;
+                            }
+                        }
+                        m_Kin[nodeId] = m_InternalEdges;
+                        /*const std::set<long>& communities = m_Cover.NodeCommunities(nodeId);
                         for(auto it = communities.begin(); it != communities.end(); ++it ) {
                             if( *it != m_Id ) {
                                 m_Cover.m_CommunityMatrix.Inc( m_Id, *it );
                             }
                         }
+                        */
+                        
+                    }
+
+                    /** @brief Tests if a node belongs to the community.
+                     *  @param nodeId The node to test.
+                     *  @return true if the node belongs to the community.*/
+                    inline bool Contains( long nodeId ) const {
+                        return m_Nodes.find(nodeId) != m_Nodes.end();
                     }
 
                     /** @brief Removes a node from the community.
                      *  @param nodeId The node to remove.*/
                     inline void  Remove( long nodeId ) {
+                        assert(Contains(nodeId));
                         m_Nodes.erase( nodeId );
                         m_Cover.m_NodeCommunities[nodeId]->erase(m_Id);
-                        const std::set<long>& communities = m_Cover.NodeCommunities(nodeId);
+                        const Graph& graph = GetGraph();
+                        long degree = graph.GetDegree( nodeId );
+                        const long* adjacencies = graph.GetNeighbors( nodeId );
+                        for( long i = 0; i < degree; ++i ) {
+                            if( Contains(adjacencies[i]) ) {
+                                m_InternalEdges--;
+                                m_Kin[adjacencies[i]]--;
+                                m_ExternalEdges++;
+                            } else {
+                                m_ExternalEdges--;
+                            }
+                        }
+                        m_Kin.erase(nodeId);
+                        /*const std::set<long>& communities = m_Cover.NodeCommunities(nodeId);
                         for(auto it = communities.begin(); it != communities.end(); ++it ) {
                             if( *it != m_Id ) {
                                 m_Cover.m_CommunityMatrix.Dec( m_Id, *it );
                             }
                         }
+                        */
                     }
 
                     /** @brief Gets the Id of the community.
                      *  @return The id of the community.*/
-                    inline  long    Id() {
+                    inline  long    Id() const {
                        return m_Id; 
+                    }
+
+                    /** @brief Gets the graph the community belong.
+                     *  @return The graph.*/
+                    inline const Graph& GetGraph() const {
+                        return m_Cover.GetGraph();
+                    }
+
+                    /** @brief Gets the cover the community belongs to.
+                     *  @return The cover.*/
+                    inline const Cover& GetCover() const {
+                        return m_Cover;
                     }
 
                     inline const std::set< long>& Nodes() const {
                         return static_cast<const std::set< long> &>(m_Nodes);
                     }
 
+                    /** @brief Gets the number of internal edges of the community.
+                     *  @return The number of internal edges.*/
+                    inline long GetInternalEdges() const {
+                        return m_InternalEdges;
+                    }
+
+                    /** @brief Gets the number of internal edges of a node.
+                     *  @param nodeId The node to retrieve the internal edges from.
+                     *  @return The number of internal edges of the node.*/
+                    inline long GetInternalEdges(long nodeId) const {
+                        auto it = m_Kin.find(nodeId);
+                        if( it != m_Kin.end() ) {
+                            return (*it).second;
+                        }
+                        assert(0);
+                        return -1;
+                    }
+
+                    /** @brief Gets the number of external edges of the community.
+                     *  @return The number of external edges.*/
+                    inline long GetExternalEdges() const {
+                        return m_ExternalEdges;
+                    }
+
                 private:  
                     friend class Cover;
                     Community( Cover & cover,  long id );
                     std::set<long> m_Nodes;
+                    std::map<long, long> m_Kin;
                     Cover&         m_Cover;
                     const long     m_Id;
+                    long           m_InternalEdges;
+                    long           m_ExternalEdges;
             };
 
             Cover( const Graph& graph );
@@ -88,18 +164,24 @@ namespace triforce {
             /** @brief  Retrieve the community identifiers where a node belongs to.
              *  @params nodeId The node to retrieve the communities from.
              *  @return a set with the community identifiers.*/  
-            const std::set< long>& NodeCommunities( long nodeId ) const;
+            const std::set<long> NodeCommunities( long nodeId ) const;
+
+
+            /** @brief  Returns the number of communities a node belongs to.
+             *  @params nodeId The node to retrieve the communities from.
+             *  @return the number of communities */  
+            long NumNodeCommunities( long nodeId ) const;
 
 
             /** @brief  Retrieves a community.
              *  @params communityId The community identifier .
              *  @return the community.*/  
-            Community&  GetCommunity(  long communityId );
+            Community&  GetCommunity( long communityId );
 
             /** @brief  Retrieves a community.
              *  @params communityId The community identifier .
              *  @return the community.*/  
-            const Community& GetCommunity(  long communityId ) const;
+            const Community& GetCommunity( long communityId ) const;
 
             /** @brief Retrieves the graph of the cover.
              *  @return The graph of the cover.*/
@@ -113,11 +195,30 @@ namespace triforce {
                 return m_Communities.size();
             }
 
-            /** @brief Refines the communities in the cover.*/
-            void RefineCommunities();
+            /** @brief Refines the communities in the cover.
+             *  @param alpha The alpha value controling the cohesivness of the communities
+             *  @param overlapp The level of overlapp allowed.*/
+            void RefineCommunities( double alpha , double overlapp );
 
         private:
+            enum MovementType {
+                E_REMOVE,
+                E_INSERT,
+                E_TRANSFER,
+            };
+
+            struct Movement {
+                MovementType m_Type;
+                long m_NodeId;
+                long m_CommunityId1;
+                long m_CommunityId2;
+            };
+
             friend class Community;
+            friend bool triforce::Similar( const Cover& cover, const Cover::Community& communityA, const Cover::Community& communityB, double overlapp );
+            friend bool triforce::ViolatesOverlappInsert( const long i, const Cover::Community& community);
+            friend bool triforce::ViolatesOverlappRemove( const long i, const Cover::Community& community);
+
             /** @brief Initializes the cover with an initial assignment of nodes to communities.*/
             void  Initialize();
 
@@ -133,7 +234,16 @@ namespace triforce {
              *  @param array The serialized cover. 
              *  @param size The size of the array.*/
             void Deserialize( long* array, long size );
-             
+
+            /** @brief Performs the best possible movement, if any, for the givn node.
+             *  @param i The node to move.
+             *  @param alpha the parameter alpha.
+             *  @param overlapp the level of allowed overlap.
+             *  @param The movement struct to store the movement.
+             *  @return True if the node is moved*/
+            bool PerformBestMovement( const long i, double alpha, double overlapp, double bestScore, Movement& movement ); 
+
+
             const Graph&                                        m_Graph;            /**< @brief The graph of the cover.*/
             std::vector<Community*>                             m_Communities;      /**< @brief The vector of communities in the graph.*/
             std::vector<std::set<long>*>                        m_NodeCommunities;  /**< @brief The communities each node belong.*/

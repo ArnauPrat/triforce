@@ -17,6 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SPARSE_MATRIX_H
 
 #include <map>
+#include <assert.h>
+
 namespace triforce {
 
     template <class T>
@@ -47,7 +49,7 @@ namespace triforce {
              *  @param i The ith row of the matrix. 
              *  @param j The jth column of the matrix. 
              *  @return The current value.*/ 
-            T Get( const long i, const long j ) {
+            T Get( const long i, const long j ) const {
                 Position p;
                 if( i < j ) {
                     p.m_I = i;
@@ -56,7 +58,11 @@ namespace triforce {
                     p.m_J = i;
                     p.m_I = j;
                 }
-                return m_Matrix[p];
+                auto it = m_Matrix.find(p);
+                if( it != m_Matrix.end() ) {
+                    return (*it).second;
+                }
+                return 0;
             }
 
             /** @brief Increments the value at a given position.
