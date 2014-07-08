@@ -317,7 +317,7 @@ namespace triforce {
      *  @param a The first tuple to sort.
      *  @param b The second tuple to sort.   
      *  @return -1 if a goes before b. 1 if a goes after b. 0 if a and b are equal.*/
-    static bool CompareClusterings(const std::tuple<  long, double,  long >& a, const std::tuple<  long, double,  long > b) {
+    static bool CompareClusterings(const std::tuple<long, double,long >& a, const std::tuple<long, double, long> b) {
         //return std::tie( std::get<1>(a), std::get<2>(a) ) < std::tie( std::get<1>(b), std::get<2>(b) ) ;
         //return std::tie( std::get<2>(a), std::get<1>(a) ) < std::tie( std::get<2>(b), std::get<1>(b) ) ;
         return std::tie( std::get<1>(a), std::get<2>(a) ) > std::tie( std::get<1>(b), std::get<2>(b) ) ;
