@@ -22,7 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <vector>
 
 namespace triforce {
-    
+   
+   struct Movement; 
 
     class Cover {
         public: 
@@ -149,6 +150,8 @@ namespace triforce {
 
                 private:  
                     friend class Cover;
+                    friend void triforce::Initialize( Cover& cover, double alpha, double overlapp );
+                    friend void triforce::RefineCommunities( Cover& cover, double alpha , double overlapp );
                     Community( Cover & cover,  long id );
                     std::set<long> m_Nodes;
                     std::map<long, long> m_Kin;
@@ -195,32 +198,12 @@ namespace triforce {
                 return m_Communities.size();
             }
 
-            /** @brief Refines the communities in the cover.
-             *  @param alpha The alpha value controling the cohesivness of the communities
-             *  @param overlapp The level of overlapp allowed.*/
-            void RefineCommunities( double alpha , double overlapp );
-
-        private:
-            enum MovementType {
-                E_REMOVE,
-                E_INSERT,
-                E_TRANSFER,
-            };
-
-            struct Movement {
-                MovementType m_Type;
-                long m_NodeId;
-                long m_CommunityId1;
-                long m_CommunityId2;
-            };
-
-            friend class Community;
-            friend bool triforce::Similar( const Cover& cover, const Cover::Community& communityA, const Cover::Community& communityB, double overlapp );
-            friend bool triforce::ViolatesOverlappInsert( const long i, const Cover::Community& community);
-            friend bool triforce::ViolatesOverlappRemove( const long i, const Cover::Community& community);
-
-            /** @brief Initializes the cover with an initial assignment of nodes to communities.*/
-            void  Initialize();
+            /** @brief Retrieves the number of communities a node belongs to.
+             *  @param nodeId The node.
+             *  @return The number of communities a node belongs to.*/
+            inline long NumCommunities( long nodeId ) const {
+                return m_NodeCommunities[nodeId]->size();
+            }
 
             /** @brief Clears the cover.*/
             void Clear();
@@ -235,13 +218,19 @@ namespace triforce {
              *  @param size The size of the array.*/
             void Deserialize( long* array, long size );
 
-            /** @brief Performs the best possible movement, if any, for the givn node.
-             *  @param i The node to move.
-             *  @param alpha the parameter alpha.
-             *  @param overlapp the level of allowed overlap.
-             *  @param The movement struct to store the movement.
-             *  @return True if the node is moved*/
-            bool PerformBestMovement( const long i, double alpha, double overlapp, double bestScore, Movement& movement ); 
+
+        private:
+
+            friend class Community;
+            friend bool triforce::Similar( const Cover& cover, const Cover::Community& communityA, const Cover::Community& communityB, double overlapp );
+            friend bool triforce::ViolatesOverlappInsert( const long i, const Cover::Community& community);
+            friend bool triforce::ViolatesOverlappRemove( const long i, const Cover::Community& community);
+            friend void triforce::Initialize( Cover& cover, double alpha, double overlapp );
+            friend void triforce::RefineCommunities( Cover& cover, double alpha , double overlapp );
+            friend bool PerformBestMovement( Cover& cover, const long nodeId, double alpha, double overlapp, double bestScore, Movement& movement );
+
+            /** @brief Initializes the cover with an initial assignment of nodes to communities.*/
+//            void  Initialize();
 
 
             const Graph&                                        m_Graph;            /**< @brief The graph of the cover.*/

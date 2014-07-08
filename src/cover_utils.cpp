@@ -13,10 +13,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "cover_utils.h"
+#include "graph_utils.h"
 #include "graph.h"
 #include <set>
 #include <algorithm>
 
+#define LOOKAHEAD 5 
 
 namespace triforce {
 
@@ -81,7 +83,7 @@ namespace triforce {
             }
             long denom = kout + unionSet.size() - 1;
             validOverlapp = true;
-            if( denom == 0 ) return 0;
+            if( denom == 0 ) return 0.0;
             return kin /(double)( kout + kin + alpha*(unionSet.size()-kin - 1));
         }
         validOverlapp = false;
@@ -178,7 +180,7 @@ namespace triforce {
         return res;
     }
 
-    double TestRemove( const long nodeId, const Cover::Community& community, double alpha, double overlapp ) {
+    double TestRemove( const long nodeId, const Cover::Community& community, double alpha, double overlapp, bool& validOverlapp) {
         const Cover& cover = community.GetCover();
         const Graph& graph = community.GetGraph(); 
         Cover::Community& comAux = const_cast<Cover::Community&>(community);
@@ -197,30 +199,41 @@ namespace triforce {
             }
         }
         */
-
         double before = 0.0;
         double after = 0.0;
         long r = community.Size();
-        bool validOverlapp;
+        bool tempValidOverlapp;
+        bool violatesOverlapp = false;
         std::set<long> nodes = community.Nodes();
         for( auto it = nodes.begin(); it != nodes.end(); ++it ) {
-            before += Score( cover, *it, alpha, overlapp, validOverlapp );
+            before += Score( cover, *it, alpha, overlapp, tempValidOverlapp );
+            violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
         }
-        comAux.Remove(nodeId);
-        for( auto it = nodes.begin(); it != nodes.end(); ++it ) {
-            after += Score( cover, *it, alpha, overlapp, validOverlapp );
-        }
-        after += Score( cover, nodeId, alpha, overlapp, validOverlapp );
-        comAux.Add(nodeId);
-        double increment = after - before;
+        if( violatesOverlapp ) before = 0.0;
 
+        comAux.Remove(nodeId);
+        nodes = community.Nodes();
+        violatesOverlapp = false;
+        for( auto it = nodes.begin(); it != nodes.end(); ++it ) {
+            after += Score( cover, *it, alpha, overlapp, tempValidOverlapp );
+            violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
+        }
+        after += Score( cover, nodeId, alpha, overlapp, tempValidOverlapp );
+        violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
+        if( violatesOverlapp ) {
+            validOverlapp = false;
+        } else {
+            validOverlapp = true;
+        }
+        comAux.Add(nodeId);
         /*double pin = ((community.GetInternalEdges()-din)*2)/(double)((community.Size()-1)*(community.Size()-2));
         double increment = CheckForIncrement( community.Size() - 1, din, dout, community.GetExternalEdges()-dout+din, pin, alpha);
         */
-        return  increment;
+        //return  (after - before)/graph.GetNumNodes();
+        return  (after - before);
     }
 
-    double TestInsert( const long nodeId, const Cover::Community& community, double alpha, double overlapp ) {
+    double TestInsert( const long nodeId, const Cover::Community& community, double alpha, double overlapp, bool& validOverlapp ) {
         const Cover& cover = community.GetCover();
         const Graph& graph = community.GetGraph(); 
         Cover::Community& comAux = const_cast<Cover::Community&>(community);
@@ -241,20 +254,33 @@ namespace triforce {
 
         double before = 0.0;
         double after = 0.0;
-        long r = community.Size();
-        bool validOverlapp;
-        std::set<long> nodes = community.Nodes();
+        bool tempValidOverlapp;
+        bool violatesOverlapp = false;
+        std::set<long> nodes = comAux.Nodes();
         for( auto it = nodes.begin(); it != nodes.end(); ++it ) {
-            before += Score( cover, *it, alpha, overlapp, validOverlapp );
+            before += Score( cover, *it, alpha, overlapp, tempValidOverlapp );
+            violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
         }
-        before += Score( cover, nodeId, alpha, overlapp, validOverlapp );
+        before += Score( cover, nodeId, alpha, overlapp, tempValidOverlapp );
+        violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
+        if( violatesOverlapp ) before = 0.0;
+        
+        violatesOverlapp = false;
         comAux.Add(nodeId);
+        nodes = comAux.Nodes();
         for( auto it = nodes.begin(); it != nodes.end(); ++it ) {
-            after += Score( cover, *it, alpha, overlapp, validOverlapp );
+            after += Score( cover, *it, alpha, overlapp, tempValidOverlapp );
+            violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
         }
         comAux.Remove(nodeId);
-        double increment = after - before;
-        return increment;
+        if( violatesOverlapp ) {
+            validOverlapp = false;
+        } else {
+            validOverlapp = true;
+        }
+
+        //return (after/graph.GetNumNodes()) - (before/graph.GetNumNodes());
+        return (after) - (before);
     }
 
     bool ViolatesOverlappInsert( const long nodeId, const Cover::Community& community) {
@@ -285,5 +311,274 @@ namespace triforce {
         }
         */
         return true;
+    }
+
+    /** @brief Compares two node clustering.
+     *  @param a The first tuple to sort.
+     *  @param b The second tuple to sort.   
+     *  @return -1 if a goes before b. 1 if a goes after b. 0 if a and b are equal.*/
+    static bool CompareClusterings(const std::tuple<  long, double,  long >& a, const std::tuple<  long, double,  long > b) {
+        //return std::tie( std::get<1>(a), std::get<2>(a) ) < std::tie( std::get<1>(b), std::get<2>(b) ) ;
+        //return std::tie( std::get<2>(a), std::get<1>(a) ) < std::tie( std::get<2>(b), std::get<1>(b) ) ;
+        return std::tie( std::get<1>(a), std::get<2>(a) ) > std::tie( std::get<1>(b), std::get<2>(b) ) ;
+    }
+
+    void Initialize( Cover& cover, double alpha, double overlapp ) {
+
+/*        const Graph& graph = cover.GetGraph();
+        for( long i = 0; i < graph.GetNumNodes(); ++i) {    
+            Cover::Community* community = new Cover::Community( cover, i );
+            cover.m_Communities.push_back(community);
+            community->Add(i);
+        }
+        */
+        const Graph& graph = cover.GetGraph();
+        std::vector< std::tuple<  long, double,  long > > nC( graph.GetNumNodes() ); 
+        for(  long i = 0; i < graph.GetNumNodes(); ++i ) { 
+            nC.push_back( std::tuple<  long, double,  long >( i,
+                        ClusteringCoefficient( graph, i ),
+                        graph.GetDegree(i)) 
+                    );  
+        }   
+        std::sort(nC.begin(), nC.end(), CompareClusterings );                     //Sorts the nC
+        std::vector<bool> visited( graph.GetNumNodes(), false );                //Vector to track those visited members.
+        long nextLabel = 0;
+        for( auto it = nC.begin(); it != nC.end(); ++it ) {    
+            long nodeId = std::get<0>(*it);
+            if(!visited[nodeId]) {
+                visited[nodeId] = true;
+                Cover::Community* community = new Cover::Community( cover, nextLabel );
+                cover.m_Communities.push_back(community);
+                community->Add(nodeId);
+                const  long* adjacencies = graph.GetNeighbors(nodeId);
+                long degree = graph.GetDegree(nodeId);
+                /*double bestImprovement = 0.0;
+                long bestNode = -1;
+                bool keepImproving = true;
+                while(keepImproving) {
+                    keepImproving = false;
+                    for( long j = 0; j < degree; ++j ) { 
+                        long neighbor = adjacencies[j];
+                        if(!visited[neighbor]) {
+                            double aux = TestInsert( neighbor, *community, alpha, overlapp );
+                            if( aux > bestImprovement && CanOverlapMore( cover, neighbor, overlapp ) ) {
+                                bestImprovement = aux; 
+                                bestNode = neighbor;
+                            }
+                        }
+                    }   
+                    if(bestImprovement > 0.0) {
+                        visited[bestNode] = true;
+                        keepImproving = true;
+                        community->Add(bestNode);
+                        bestImprovement = 0.0;
+                        bestNode = -1;
+                    }
+                }*/
+                
+
+                    for( long j = 0; j < degree; ++j ) { 
+                        long neighbor = adjacencies[j];
+                        if(!visited[neighbor]) {
+                            community->Add(neighbor);
+                            visited[neighbor] = true;
+                        }
+                    }   
+                nextLabel++;
+            }   
+        }   
+    }
+
+    enum MovementType {
+        E_REMOVE,
+        E_INSERT,
+        E_TRANSFER,
+    };
+
+    struct Movement {
+        MovementType m_Type;
+        long m_NodeId;
+        long m_CommunityId1;
+        long m_CommunityId2;
+        double m_Improvement;
+    };
+
+  bool PerformBestMovement( Cover& cover, const long nodeId, double alpha, double overlapp, double bestScore, Movement& movement ) {
+        bool movementFound = false;
+        double bestRemoveImprovement = -10000000000000000000000.0;
+        long bestRemoveCommunity = -1;
+        bool bestRemoveFound = false;
+        bool bestRemoveOverlapp = false;
+        std::set<long> nodeCommunities = cover.NodeCommunities( nodeId );
+        for(auto it = nodeCommunities.begin(); it != nodeCommunities.end(); ++it) {
+            Cover::Community& community = cover.GetCommunity(*it);
+            bool auxValidOverlapp;
+            double aux = TestRemove( nodeId, community, alpha, overlapp, auxValidOverlapp);
+            if( aux >= bestRemoveImprovement  ) {
+                bestRemoveImprovement = aux; 
+                bestRemoveCommunity = community.Id();
+                bestRemoveOverlapp = auxValidOverlapp;
+                if( bestRemoveImprovement > 0.0 ) bestRemoveFound = true;
+            }
+        }
+
+        const long* adjacencies = cover.m_Graph.GetNeighbors(nodeId); 
+        long degree = cover.m_Graph.GetDegree(nodeId);
+        std::set<long> possibleCommunities;
+        for( long i = 0; i < degree; ++i ) {
+            long neighbor = adjacencies[i];
+            const std::set<long>& neighborCommunities = cover.NodeCommunities( neighbor );
+            for( auto it = neighborCommunities.begin(); it != neighborCommunities.end(); ++it ) {
+                const Cover::Community& community = cover.GetCommunity(*it);
+                if( nodeCommunities.find(*it) == nodeCommunities.end())  {
+                    possibleCommunities.insert(*it);
+                }
+            }
+        }
+
+        double bestInsertImprovement = -1000000000000000000000000.0;
+        long bestInsertCommunity = -1;
+        bool bestInsertFound = false;
+        bool bestInsertOverlapp = false;
+        for( auto it = possibleCommunities.begin(); it != possibleCommunities.end(); ++it ) {
+            Cover::Community& community = cover.GetCommunity(*it);
+            bool auxOverlapp;
+            double aux = TestInsert( nodeId, community, alpha, overlapp, auxOverlapp );
+            if( aux >= bestInsertImprovement ) {
+                bestInsertImprovement = aux; 
+                bestInsertCommunity = community.Id();
+                bestInsertOverlapp = auxOverlapp;
+                if( bestInsertImprovement > 0.0 ) bestInsertFound = true;
+            }
+        }
+
+        double bestImprovement = 0.0;
+        if( bestRemoveFound && bestRemoveOverlapp ) {
+            bestImprovement = bestRemoveImprovement;
+            movement.m_Type = E_REMOVE;
+            movement.m_NodeId = nodeId;
+            movement.m_CommunityId1 = bestRemoveCommunity;
+            movement.m_Improvement = bestImprovement;
+            movementFound = true;
+        }
+        if( bestInsertFound && bestInsertOverlapp && (bestInsertImprovement > bestRemoveImprovement) ) {
+            bestImprovement = bestInsertImprovement;
+            movement.m_Type = E_INSERT;
+            movement.m_NodeId = nodeId;
+            movement.m_CommunityId1 = bestInsertCommunity;
+            movement.m_Improvement = bestImprovement;
+            movementFound = true;
+        }
+        double bestRemoveAndInsert = (bestInsertImprovement + bestRemoveImprovement);
+        if( (bestRemoveAndInsert > 0.0) &&  (bestRemoveAndInsert > bestImprovement) && ValidOverlapp(cover, nodeId, overlapp)) {
+            bestImprovement = bestRemoveAndInsert;
+            movement.m_Type = E_TRANSFER;
+            movement.m_NodeId = nodeId;
+            movement.m_CommunityId1 = bestRemoveCommunity;
+            movement.m_CommunityId2 = bestInsertCommunity;
+            movement.m_Improvement = bestImprovement;
+            movementFound = true;
+        } 
+        //std::cout << cover.m_Graph.ReMap(nodeId) << " "<< bestRemoveAndInsert << " " << bestInsertImprovement << " " << bestRemoveImprovement << " " << bestImprovement << " " << movement.m_Type << " " << movementFound << std::endl;
+
+//        nodeCommunities = NodeCommunities( nodeId );
+//        for(auto it = nodeCommunities.begin(); it != nodeCommunities.end(); ++it) {
+//            Cover::Community& community1 = this->GetCommunity(*it);
+//            for( auto it2 = possibleCommunities.begin(); it2 != possibleCommunities.end(); ++it2 ) {
+//                Cover::Community& community2 = this->GetCommunity(*it2);
+//                if( (*it != *it2) && community1.Contains(nodeId) && !community2.Contains(nodeId) ) {
+//                /*    community1.Remove(nodeId);
+//                    community2.Add(nodeId);
+//                    double newScore = Score( *this, alpha, overlapp );
+//                    community1.Add(nodeId);
+//                    community2.Remove(nodeId);
+//                    double scoreDiff = newScore - bestScore ;
+//                    if( scoreDiff > bestImprovement) {
+//                        bestImprovement = newScore - bestScore; 
+//                        movement.m_Type = E_TRANSFER;
+//                        movement.m_NodeId = nodeId;
+//                        movement.m_CommunityId1 = community1.Id();
+//                        movement.m_CommunityId2 = community2.Id();
+//                        movementFound = true;
+//                    }
+//                    */
+//                    double aux = TestInsert( nodeId, community2, alpha, overlapp ) + TestRemove( nodeId, community1, alpha, overlapp );
+//                    if( aux > bestImprovement ) {
+//                        bestImprovement = aux; 
+//                        movement.m_Type = E_TRANSFER;
+//                        movement.m_NodeId = nodeId;
+//                        movement.m_CommunityId1 = community1.Id();
+//                        movement.m_CommunityId2 = community2.Id();
+//                        movementFound = true;
+//                    }
+//                }
+//            }
+//        }
+        return movementFound;
+    }
+
+void RefineCommunities( Cover& cover, double alpha, double overlapp ) {
+        long bestCoverSize = 0;
+        long* bestCover = cover.Serialize( bestCoverSize );
+        double bestScore = Score(cover, alpha, overlapp );
+        double currentScore = bestScore;
+        std::cout << "Initial Score: " << bestScore << std::endl;
+        int lookahead = LOOKAHEAD;
+        while(lookahead > 0) {
+            lookahead--;
+            std::cout << "Starting Iteration" << std::endl;
+            //Compute new cover.
+            std::vector<Movement> movements;
+            for( long i = 0; i < cover.m_Graph.GetNumNodes(); ++i ) {
+                Movement movement;
+                if(PerformBestMovement(cover,i, alpha, overlapp, currentScore, movement)) {
+                    movements.push_back(movement);
+                }
+            }
+            std::cout << "Number of movements performed " << movements.size() << std::endl;
+            Cover::Community* community1; 
+            Cover::Community* community2;
+            for( long i = 0; i < movements.size(); ++i ) {
+                Movement& movement = movements[i];
+//                std::cout << movement.m_NodeId << " " << movement.m_Improvement << " " << movement.m_Type << " " << movement.m_CommunityId1 << " " << movement.m_CommunityId2 << std::endl;
+                switch(movement.m_Type) {
+                    case E_REMOVE:
+                        community1 = &(cover.GetCommunity(movement.m_CommunityId1));
+                        community1->Remove(movement.m_NodeId);
+                        if(cover.NumCommunities(movement.m_NodeId) == 0) {
+//                            Cover::Community& community = cover.GetCommunity(movement.m_NodeId);
+                            /*if(community.Size() == 0 ) {
+                                community.Add(movement.m_NodeId);
+                            } else {*/
+                                Cover::Community* community = new Cover::Community(cover,cover.NumCommunities()); 
+                                cover.m_Communities.push_back(community);
+                                community->Add(movement.m_NodeId);
+                           // }
+                        }
+                        break;
+                    case E_INSERT:
+                        community1 = &(cover.GetCommunity(movement.m_CommunityId1));
+                        community1->Add(movement.m_NodeId);
+                        break;
+                    case E_TRANSFER:
+                        community1 = &(cover.GetCommunity(movement.m_CommunityId1));
+                        community2 = &(cover.GetCommunity(movement.m_CommunityId2));
+                        community1->Remove(movement.m_NodeId);
+                        community2->Add(movement.m_NodeId);
+                        break;
+                };
+            }
+            currentScore = Score(cover, alpha, overlapp );
+            std::cout << "New Score " << currentScore << std::endl;
+            if( currentScore > bestScore ) {
+                std::cout << "Cover Improved" << std::endl;
+                delete [] bestCover;
+                bestCover = cover.Serialize( bestCoverSize );
+                bestScore = currentScore;
+                lookahead = LOOKAHEAD;
+            }
+        }        
+        cover.Deserialize(bestCover, bestCoverSize);
+        delete [] bestCover;
     }
 }

@@ -62,13 +62,13 @@ namespace triforce {
      *  @param nodeID The id of the node.
      *  @param community The community to test.
      *  @return The improvement*/
-    double TestRemove( const long nodeId, const Cover::Community& comunity, double alpha, double overlapp );
+    double TestRemove( const long nodeId, const Cover::Community& comunity, double alpha, double overlapp, bool& validOverlapp );
 
     /** @brief Tests if a node should be inserted into a community.
      *  @param nodeID The id of the node.
      *  @param community The community to test.
      *  @return The improvement.*/
-    double TestInsert( const long nodeId, const Cover::Community& comunity, double alpha, double overlapp );
+    double TestInsert( const long nodeId, const Cover::Community& comunity, double alpha, double overlapp, bool& validOverlapp );
 
     /** @brief Tests if a node has a valid overlapp.
      *  @param nodeId The id of the node.
@@ -91,6 +91,19 @@ namespace triforce {
      *  @param community The community to test.
      *  @return true if removing the node violates overlapp*/
     bool ViolatesOverlappRemove( const long nodeId, const Cover::Community& community);
+
+
+    /** @brief Initializes a cover with an initial partition
+     *  @param alpha The alpha parameter to use.
+     *  @param overlapp The maximum alowed overlapp.*/
+    void Initialize( Cover& cover, double alpha, double overlapp );
+
+    /** @brief Refines the communities in the cover.
+     *  @param alpha The alpha value controling the cohesivness of the communities
+     *  @param overlapp The level of overlapp allowed.*/
+    void RefineCommunities( Cover& cover, double alpha , double overlapp );
+
+    bool PerformBestMovement( Cover& cover, const long nodeId, double alpha, double overlapp, double bestScore, Movement& movement );
 }
 
 #endif

@@ -87,7 +87,8 @@ int main( int argc, char** argv ) {
     triforce::Graph graph;
     graph.Load(graphFileName, 1);
     triforce::Cover cover(graph);
-    cover.RefineCommunities(alpha, overlapp);
+    triforce::Initialize(cover,alpha,overlapp);
+    triforce::RefineCommunities(cover, alpha, overlapp);
     std::ofstream outputFile;
     outputFile.open(outputFileName);
     Print(cover, outputFile);
