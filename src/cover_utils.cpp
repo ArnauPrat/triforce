@@ -570,13 +570,14 @@ void RefineCommunities( Cover& cover, double alpha, double overlapp ) {
             }
             currentScore = Score(cover, alpha, overlapp );
             std::cout << "New Score " << currentScore << std::endl;
-            if( currentScore > bestScore ) {
+            double diff = currentScore - bestScore;
+            if( diff > 0.0 ) {
                 std::cout << "Cover Improved" << std::endl;
                 delete [] bestCover;
                 bestCover = cover.Serialize( bestCoverSize );
                 bestScore = currentScore;
                 lookahead = LOOKAHEAD;
-                if( currentScore - bestScore <= 0.001 ) {
+                if( diff <= 0.001 ) {
                     break;
                 }
             }
