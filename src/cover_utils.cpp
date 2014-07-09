@@ -576,6 +576,9 @@ void RefineCommunities( Cover& cover, double alpha, double overlapp ) {
                 bestCover = cover.Serialize( bestCoverSize );
                 bestScore = currentScore;
                 lookahead = LOOKAHEAD;
+                if( currentScore - bestScore <= 0.001 ) {
+                    break;
+                }
             }
         }        
         cover.Deserialize(bestCover, bestCoverSize);
