@@ -92,7 +92,7 @@ int main( int argc, char** argv ) {
     std::ofstream outputFile;
     outputFile.open(outputFileName);
     Print(cover, outputFile);
-    PrintZero(cover, std::cout, alpha, overlapp);
+//    PrintZero(cover, std::cout, alpha, overlapp);
     outputFile.close();
     std::cout << "Score: " << triforce::Score( cover, alpha, overlapp ) << std::endl;
 //    std::cout << "Number of communities: " << cover.NumCommunities() << std::endl;
