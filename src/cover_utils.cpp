@@ -540,20 +540,14 @@ void RefineCommunities( Cover& cover, double alpha, double overlapp ) {
             Cover::Community* community2;
             for( long i = 0; i < movements.size(); ++i ) {
                 Movement& movement = movements[i];
-//                std::cout << movement.m_NodeId << " " << movement.m_Improvement << " " << movement.m_Type << " " << movement.m_CommunityId1 << " " << movement.m_CommunityId2 << std::endl;
                 switch(movement.m_Type) {
                     case E_REMOVE:
                         community1 = &(cover.GetCommunity(movement.m_CommunityId1));
                         community1->Remove(movement.m_NodeId);
                         if(cover.NumCommunities(movement.m_NodeId) == 0) {
-//                            Cover::Community& community = cover.GetCommunity(movement.m_NodeId);
-                            /*if(community.Size() == 0 ) {
-                                community.Add(movement.m_NodeId);
-                            } else {*/
-                                Cover::Community* community = new Cover::Community(cover,cover.NumCommunities()); 
-                                cover.m_Communities.push_back(community);
-                                community->Add(movement.m_NodeId);
-                           // }
+                            Cover::Community* community = new Cover::Community(cover,cover.NumCommunities()); 
+                            cover.m_Communities.push_back(community);
+                            community->Add(movement.m_NodeId);
                         }
                         break;
                     case E_INSERT:
