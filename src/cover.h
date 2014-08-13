@@ -32,6 +32,14 @@ namespace triforce {
                 public:
                     ~Community();
 
+                    inline void Print() {
+                        std::cout << m_Id << ": ";
+                        for( long l : m_Nodes ) {
+                            std::cout << l << " ";
+                        }
+                        std::cout << std::endl;
+                    }
+
                     /** @brief Retrieves the size of the community.
                      *  @return The size of the community.*/
                     inline long Size() const {
@@ -120,7 +128,7 @@ namespace triforce {
                         return m_Cover;
                     }
 
-                    inline const std::set< long>& Nodes() const {
+                    inline const std::set< long> Nodes() const {
                         return static_cast<const std::set< long> &>(m_Nodes);
                     }
 
@@ -197,6 +205,7 @@ namespace triforce {
             inline long NumCommunities() const {
                 return m_Communities.size();
             }
+
 
             /** @brief Retrieves the number of communities a node belongs to.
              *  @param nodeId The node.

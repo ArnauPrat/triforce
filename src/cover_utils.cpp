@@ -493,7 +493,8 @@ namespace triforce {
       std::set<long> temp1 = community1.Nodes();;
       std::set<long> temp2 = community2.Nodes();;
       std::set<long> unionSet = community1.Nodes();
-      std::set<long> intersectionSet = community2.Nodes();;
+      std::set<long> intersectionSet;
+
       for( long n : temp1 ) {
           unionSet.insert(n);
       }
@@ -504,7 +505,7 @@ namespace triforce {
       
       double before = 0.0;
       for( long n : unionSet ) {
-          if( temp1.find(n) != temp1.end() && temp2.find(n) != temp2.end() ) {
+          if( (temp1.find(n) != temp1.end()) && (temp2.find(n) != temp2.end()) ) {
               intersectionSet.insert(n);
           }
           bool valid;
@@ -538,8 +539,8 @@ namespace triforce {
           for( long n : intersectionSet ) {
               community1.Add(n);
           }
-
       }
+
 
   }
 
@@ -557,14 +558,20 @@ namespace triforce {
                   const std::set<long> nCommunities = cover.NodeCommunities( neighbor );
                   for( auto it = communities.begin(); it != communities.end(); ++it ) {
                       for( auto it2 = nCommunities.begin(); it2 != nCommunities.end(); ++it2 ) {
-                          mergeTries.insert(std::tuple<long,long>(*it, *it2));
+                          if(*it != *it2 ) {
+                              mergeTries.insert(std::tuple<long,long>(*it, *it2));
+                          }
                       }
                   }
               }
           }
       }
       for( std::tuple<long,long> t : mergeTries ) {
-          Merge( cover, std::get<0>(t),std::get<1>(t), alpha, overlapp );
+          const Cover::Community& communityA = cover.GetCommunity(std::get<0>(t));
+          const Cover::Community& communityB = cover.GetCommunity(std::get<1>(t));
+          if( communityA.Size() != 0 && communityB.Size() != 0 ) {
+             Merge( cover, communityA.Id(), communityB.Id(), alpha, overlapp );
+          }
       }
   }
 
@@ -625,9 +632,10 @@ namespace triforce {
               if( diff <= 0.001 ) {
                   break;
               }
-          } /*else {
+          } else {
               // Merge communities
-              cover.Deserialize(bestCover, bestCoverSize);
+              //cover.Deserialize(bestCover, bestCoverSize);
+              std::cout << "Merging communities "<< std::endl;
               MergeCommunities( cover, alpha, overlapp);
               currentScore = Score(cover, alpha, overlapp );
               std::cout << "New Score after merging communities " << currentScore << std::endl;
@@ -641,7 +649,6 @@ namespace triforce {
               }               
               
           }
-          */
       }        
       cover.Deserialize(bestCover, bestCoverSize);
       delete [] bestCover;
