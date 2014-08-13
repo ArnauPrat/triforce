@@ -623,15 +623,12 @@ namespace triforce {
           currentScore = Score(cover, alpha, overlapp );
           std::cout << "New Score " << currentScore << std::endl;
           double diff = currentScore - bestScore;
-          if( diff > 0.0 ) {
+          if( diff > 0.001) {
               std::cout << "Cover Improved" << std::endl;
               delete [] bestCover;
               bestCover = cover.Serialize( bestCoverSize );
               bestScore = currentScore;
               lookahead = LOOKAHEAD;
-              if( diff <= 0.001 ) {
-                  break;
-              }
           } else {
               // Merge communities
               //cover.Deserialize(bestCover, bestCoverSize);
@@ -647,7 +644,7 @@ namespace triforce {
                   bestScore = currentScore;
                   lookahead = LOOKAHEAD;
               }               
-              
+
           }
       }        
       cover.Deserialize(bestCover, bestCoverSize);
