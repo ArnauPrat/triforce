@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace triforce {
 
-
     /** @brief Computes the score of a cover.
      *  @param cover the cover to compute the score from.
      *  @return The score of the cover.*/
@@ -45,12 +44,10 @@ namespace triforce {
      *  @return The set of nodes in the union.*/
     std::set< long> CommunityUnion( const Cover& cover, 
                                             const  long nodeId );
-
     /** @brief Prints a cover to a stream.
      *  @param cover The cover to print.
      *  @param stream The stream to print the over.*/
     void Print( const Cover& cover, std::ostream& stream );
-
 
     /** @brief Countes the number of nodes .
      *  @param cover The cover to print.
@@ -92,7 +89,6 @@ namespace triforce {
      *  @return true if removing the node violates overlapp*/
     bool ViolatesOverlappRemove( const long nodeId, const Cover::Community& community);
 
-
     /** @brief Initializes a cover with an initial partition
      *  @param alpha The alpha parameter to use.
      *  @param overlapp The maximum alowed overlapp.*/
@@ -104,6 +100,7 @@ namespace triforce {
     void RefineCommunities( Cover& cover, double alpha , double overlapp );
 
     bool PerformBestMovement( Cover& cover, const long nodeId, double alpha, double overlapp, double bestScore, Movement& movement );
+
 }
 
 #endif

@@ -232,7 +232,6 @@ namespace triforce {
             /** @brief Initializes the cover with an initial assignment of nodes to communities.*/
 //            void  Initialize();
 
-
             const Graph&                                        m_Graph;            /**< @brief The graph of the cover.*/
             std::vector<Community*>                             m_Communities;      /**< @brief The vector of communities in the graph.*/
             std::vector<std::set<long>*>                        m_NodeCommunities;  /**< @brief The communities each node belong.*/
