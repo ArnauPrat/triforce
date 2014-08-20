@@ -86,15 +86,14 @@ int main( int argc, char** argv ) {
 
     triforce::Graph graph;
     graph.Load(graphFileName, 1);
-    triforce::Cover cover(graph);
-    triforce::Initialize(cover,alpha,overlapp);
-    triforce::RefineCommunities(cover, alpha, overlapp);
+    triforce::Cover* cover =  Create(&graph);
+    triforce::Initialize(*cover,alpha);
+    triforce::RefineCommunities(*cover, alpha, overlapp);
     std::ofstream outputFile;
     outputFile.open(outputFileName);
-    Print(cover, outputFile);
-//    PrintZero(cover, std::cout, alpha, overlapp);
+    Print(*cover, outputFile);
     outputFile.close();
-    std::cout << "Score: " << triforce::Score( cover, alpha, overlapp ) << std::endl;
-//    std::cout << "Number of communities: " << cover.NumCommunities() << std::endl;
+    std::cout << "Score: " << triforce::Score( *cover, alpha, overlapp ) << std::endl;
+    Destroy(cover);
     return 0;
 }

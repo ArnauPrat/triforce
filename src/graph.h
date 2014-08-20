@@ -16,15 +16,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CGRAPH_H
 
 #include <assert.h>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <math.h>
-#include <time.h>
 #include <map>
-#include <vector>
+#include <math.h>
 #include <set>
+#include <time.h>
+#include <vector>
 
 namespace triforce {
+
+    static int CompareLong (const void * a, const void * b) {
+        if ( *(long*)a > *(long*)b ) return 1;
+        if ( *(long*)a < *(long*)b ) return -1;
+        if ( *(long*)a == *(long*)b ) return 0;
+    }
 
 		/**	@brief This class represents a graph.*/
 class Graph {
@@ -76,6 +83,19 @@ public:
 		assert(nodeId<m_NumNodes);
 		return m_Map[nodeId];
 	}
+
+    inline long GetEdgeIndex( long nodeId, long neighborOffset ) const {
+       return m_Nodes[nodeId]+neighborOffset; 
+    }
+
+
+    inline long HasNeighbor( long nodeId, long neighbor ) const {
+        const long* adjacencies = GetNeighbors(nodeId);
+        long* pos = (long*) std::bsearch(&neighbor, adjacencies,
+                GetDegree(nodeId), sizeof(long), CompareLong);
+        if(pos) return static_cast<long>(pos - adjacencies);
+        return -1;
+    }
 
 	/** @brief Returns the map between internal identifiers to external ones. Used by some tools.
 	 *  @return The map vector.*/
