@@ -629,7 +629,7 @@ namespace triforce {
               bestCover = cover.Serialize( bestCoverSize );
               bestScore = currentScore;
               lookahead = LOOKAHEAD;
-          } else {
+          } /*else {
               // Merge communities
               //cover.Deserialize(bestCover, bestCoverSize);
               std::cout << "Merging communities "<< std::endl;
@@ -644,8 +644,8 @@ namespace triforce {
                   bestScore = currentScore;
                   lookahead = LOOKAHEAD;
               }               
-
           }
+          */
       }        
       cover.Deserialize(bestCover, bestCoverSize);
       delete [] bestCover;
