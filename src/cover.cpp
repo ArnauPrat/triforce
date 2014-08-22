@@ -21,14 +21,15 @@
 
 namespace triforce {
 
-
     Cover* Create( const Graph* graph ) {
         Cover* cover = new Cover();
         cover->m_Graph = const_cast<Graph*>(graph);
         cover->m_MembershipStats = new MembershipStats[graph->GetNumNodes()];
         cover->m_NodeMemberships = new std::set<long>[graph->GetNumNodes()];
         cover->m_Weights = new long[graph->GetNumEdges()*2];
-        cover->m_Communities = new std::set<long>[graph->GetNumNodes()];
+        for( int i = 0; i < graph->GetNumNodes(); ++i) {
+            cover->m_Communities.push_back(new std::set<long>());
+        }
         return cover;
     }
 
@@ -38,7 +39,10 @@ namespace triforce {
         memcpy(dest.m_Weights,src.m_Weights, sizeof(long)*src.m_Graph->GetNumEdges()*2);
         for( int i = 0; i < src.m_Graph->GetNumNodes(); ++i) {
             dest.m_NodeMemberships[i] = src.m_NodeMemberships[i];
-            dest.m_Communities[i] = src.m_Communities[i];
+        }
+        dest.m_Communities.clear();
+        for( int i = 0; i < src.m_Communities.size(); ++i ) {
+            dest.m_Communities.push_back( new std::set<long>(*src.m_Communities[i]));
         }
     }
 
@@ -46,9 +50,10 @@ namespace triforce {
         delete [] cover->m_MembershipStats;
         delete [] cover->m_NodeMemberships;
         delete [] cover->m_Weights;
-        delete [] cover->m_Communities;
+        for( int i = 0; i < cover->m_Communities.size(); ++i ) {
+            delete cover->m_Communities[i];
+        }
         delete cover;
     }
-
 }
 

@@ -35,11 +35,11 @@ namespace triforce {
    };
 
    struct Cover {
-       Graph*               m_Graph;
-       MembershipStats*     m_MembershipStats;
-       std::set<long>*      m_NodeMemberships;
-       long*                m_Weights;
-       std::set<long>*      m_Communities;
+       Graph*                           m_Graph;
+       MembershipStats*                 m_MembershipStats;
+       std::set<long>*                  m_NodeMemberships;
+       long*                            m_Weights;
+       std::vector<std::set<long>*>     m_Communities;
    };
 
    Cover* Create( const Graph* graph );
