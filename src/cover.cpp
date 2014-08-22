@@ -27,9 +27,6 @@ namespace triforce {
         cover->m_MembershipStats = new MembershipStats[graph->GetNumNodes()];
         cover->m_NodeMemberships = new std::set<long>[graph->GetNumNodes()];
         cover->m_Weights = new long[graph->GetNumEdges()*2];
-        for( int i = 0; i < graph->GetNumNodes(); ++i) {
-            cover->m_Communities.push_back(new std::set<long>());
-        }
         return cover;
     }
 

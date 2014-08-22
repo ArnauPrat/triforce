@@ -49,7 +49,7 @@ namespace triforce {
 
     void Print( const Cover& cover, std::ostream& stream ) {
         const Graph& graph = *cover.m_Graph;
-        for( long i = 0; i < graph.GetNumNodes(); ++i ) {
+        for( long i = 0; i < cover.m_Communities.size(); ++i ) {
             const std::set<long>& nodes = *cover.m_Communities[i];
             if( nodes.size() > 0 ) {
                 for( long n : nodes ) {
@@ -150,15 +150,17 @@ namespace triforce {
             long nodeId = std::get<0>(*it);
             if(!visited[nodeId]) {
                 visited[nodeId] = true;
-                cover.m_Communities[nodeId]->insert(nodeId);
-                cover.m_NodeMemberships[nodeId].insert(nodeId);
+                cover.m_Communities.push_back(new std::set<long>());
+                long communityId = cover.m_Communities.size() - 1;
+                cover.m_Communities[communityId]->insert(nodeId);
+                cover.m_NodeMemberships[nodeId].insert(communityId);
                 const  long* adjacencies = graph.GetNeighbors(nodeId);
                 long degree = graph.GetDegree(nodeId);
                 for( long j = 0; j < degree; ++j ) { 
                     long neighbor = adjacencies[j];
                     if(!visited[neighbor]) {
-                        cover.m_Communities[nodeId]->insert(neighbor);
-                        cover.m_NodeMemberships[neighbor].insert(nodeId);
+                        cover.m_Communities[communityId]->insert(neighbor);
+                        cover.m_NodeMemberships[neighbor].insert(communityId);
                         visited[neighbor] = true;
                     }
                 }   
@@ -214,14 +216,12 @@ namespace triforce {
             double denominator = cover.m_Graph->GetDegree(nodeId) + alpha*(cover.m_MembershipStats[nodeId].m_R-cover.m_Communities[c]->size() - (cover.m_MembershipStats[nodeId].m_DinPrima - dinPrimaLost));
             double newScore = denominator > 0 ?  (cover.m_MembershipStats[nodeId].m_Din - dinLost) / denominator : 0.0;
             increment += newScore - cover.m_MembershipStats[nodeId].m_Score;
-            if( increment > 0.0 ) {
-                Movement movement;
-                movement.m_Type = E_REMOVE;
-                movement.m_NodeId = nodeId;
-                movement.m_CommunityId1 = c;
-                movement.m_Improvement = increment;
-                removes.push_back(movement);
-            }
+            Movement movement;
+            movement.m_Type = E_REMOVE;
+            movement.m_NodeId = nodeId;
+            movement.m_CommunityId1 = c;
+            movement.m_Improvement = increment;
+            removes.push_back(movement);
         }
 
         std::vector<Movement> inserts;
@@ -266,8 +266,9 @@ namespace triforce {
         std::sort( removes.begin(), removes.end(), CompareMovement );
         std::sort( inserts.begin(), inserts.end(), CompareMovement );
         long rindex = 0, iindex = 0;
-        long slots = std::floor(MaxOverlap(degree,overlap) - cover.m_NodeMemberships[nodeId].size());
-        while( ((rindex < removes.size()) && (removes[rindex].m_Improvement != 0.0)) || (iindex < inserts.size() && (inserts[iindex].m_Improvement != 0.0))) {
+        long slots = MaxOverlap(degree,overlap) - cover.m_NodeMemberships[nodeId].size();
+        while( ( (rindex < removes.size()) && (removes[rindex].m_Improvement != 0.0)) || (iindex < inserts.size() && (inserts[iindex].m_Improvement != 0.0))) {
+        //    std::cout << nodeId << " " << slots << std::endl;
             bool movementFound = false;
             if( rindex < removes.size() && removes[rindex].m_Improvement > 0.0 ) {
                 retRemoves.push_back(removes[rindex]);
@@ -277,7 +278,7 @@ namespace triforce {
             }
             if( iindex < inserts.size() ) {
                 if( slots > 0 && inserts[iindex].m_Improvement > 0.0 ) {
-                    retInserts.push_back(inserts[rindex]);
+                    retInserts.push_back(inserts[iindex]);
                     movementFound = true;
                     iindex++;
                     slots--;
@@ -292,6 +293,7 @@ namespace triforce {
                     retTransfers.push_back(movement);
                     movementFound = true;
                     iindex++;
+                    rindex++;
                 }
             }
             if(!movementFound) return;
@@ -306,7 +308,6 @@ namespace triforce {
         double currentScore = bestScore;
         std::cout << "Initial Score: " << bestScore << std::endl;
         int lookahead = LOOKAHEAD;
-        std::list<long> slots;
         while(lookahead > 0) {
             lookahead--;
             std::cout << "Starting Iteration" << std::endl;
@@ -319,29 +320,13 @@ namespace triforce {
             for( Movement& movement : removes ) {
                 cover.m_Communities[movement.m_CommunityId1]->erase(movement.m_NodeId);
                 cover.m_NodeMemberships[movement.m_NodeId].erase(movement.m_CommunityId1);
-                if(cover.m_Communities[movement.m_CommunityId1]->size() == 0) {
-                    slots.push_back(movement.m_CommunityId1);
-                }
-
-                if(cover.m_NodeMemberships[movement.m_NodeId].size() == 0) {
-                   if(slots.size() > 0) {
-                       long community = slots.front();
-                       slots.pop_front();
-                       cover.m_Communities[community]->insert(movement.m_NodeId);
-                       cover.m_NodeMemberships[movement.m_NodeId].insert(community);
-                   } else {
-                       cover.m_Communities.push_back(new std::set<long>());
-                       cover.m_Communities[cover.m_Communities.size() - 1]->insert(movement.m_NodeId);
-                       cover.m_NodeMemberships[movement.m_NodeId].insert(cover.m_Communities.size() -1);
-                   }
-                }  
-                std::cout << "Remove" << std::endl;
+//                std::cout << "Remove " << movement.m_NodeId << " from " << movement.m_CommunityId1 << " with new size " << cover.m_Communities[movement.m_CommunityId1]->size() << std::endl;
             }
 
             for( Movement& movement : inserts ) {
                 cover.m_Communities[movement.m_CommunityId1]->insert(movement.m_NodeId);
                 cover.m_NodeMemberships[movement.m_NodeId].insert(movement.m_CommunityId1);
-                std::cout << "Insert" << std::endl;
+ //               std::cout << "Insert " << movement.m_NodeId << " to " << movement.m_CommunityId1 << std::endl;
             }
 
             for( Movement& movement : transfers ) {
@@ -349,8 +334,32 @@ namespace triforce {
                 cover.m_NodeMemberships[movement.m_NodeId].erase(movement.m_CommunityId1);
                 cover.m_Communities[movement.m_CommunityId2]->insert(movement.m_NodeId);
                 cover.m_NodeMemberships[movement.m_NodeId].insert(movement.m_CommunityId2);
-                std::cout << "Insert" << std::endl;
+  //              std::cout << "Transfer " << movement.m_NodeId << " from " << movement.m_CommunityId1 << " to " << movement.m_CommunityId2 << std::endl;
             }
+
+            std::list<long> slots;
+            for( int i = 0; i < cover.m_Communities.size(); ++i ) {
+                if( cover.m_Communities[i]->size() == 0 ) {
+                    slots.push_back(i);
+                }
+            }
+
+            for( int i = 0; i < cover.m_Graph->GetNumNodes(); ++i ) {
+                if( cover.m_NodeMemberships[i].size() == 0 ) {
+                    if( slots.size() > 1 ) {
+                        long community = slots.front();
+                        slots.pop_front();
+                        cover.m_Communities[community]->insert(i);
+                        cover.m_NodeMemberships[i].insert(community);
+                    } else {
+                        cover.m_Communities.push_back(new std::set<long>());
+                        long community = cover.m_Communities.size() - 1;
+                        cover.m_Communities[community]->insert(i);
+                        cover.m_NodeMemberships[i].insert(community);
+                    }
+                }
+            }
+
             std::cout << "Number of movements performed: " << inserts.size()+removes.size()+transfers.size() << std::endl;
             ComputeMembershipStats(cover,alpha);
             currentScore = Score(cover, alpha, overlap );
