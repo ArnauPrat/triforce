@@ -106,12 +106,12 @@ namespace triforce {
 
             denominator = graph.GetDegree(i) + alpha*( r-1 - (dinPrima-1)) ;
             cover.m_MembershipStats[i].m_ConnectedRemove = denominator > 0 ? (din-1) / denominator : 0.0;
-            std::cout << " r " << r << std::endl;
+            /*std::cout << " r " << r << std::endl;
             std::cout << " degree " << degree << std::endl;
             std::cout << " din " << din << std::endl;
             std::cout << " dinPrima " << dinPrima << std::endl;
             std::cout << " score " << cover.m_MembershipStats[i].m_Score << std::endl;
-            std::cout << " connected remove " << cover.m_MembershipStats[i].m_ConnectedRemove << std::endl;
+            std::cout << " connected remove " << cover.m_MembershipStats[i].m_ConnectedRemove << std::endl;*/
             cover.m_MembershipStats[i].m_ConnectedRemove -= cover.m_MembershipStats[i].m_Score;
 
             denominator = graph.GetDegree(i) + alpha*( r-1 - dinPrima) ;
@@ -272,15 +272,17 @@ namespace triforce {
             if( rindex < removes.size() && removes[rindex].m_Improvement > 0.0 ) {
                 retRemoves.push_back(removes[rindex]);
                 movementFound = true;
+                rindex++;
                 slots++;
             }
             if( iindex < inserts.size() ) {
                 if( slots > 0 && inserts[iindex].m_Improvement > 0.0 ) {
                     retInserts.push_back(inserts[rindex]);
                     movementFound = true;
+                    iindex++;
                     slots--;
-                } else if ( (rindex < removes.size()) && (inserts[iindex].m_Improvement > 0.0) && (removes[rindex].m_Improvement >= 0.0) &&
-                            (inserts[iindex].m_Improvement + removes[rindex].m_Improvement) >= 0.0 ) {
+                } else if ( (rindex < removes.size()) && (inserts[iindex].m_Improvement > 0.0) && (removes[rindex].m_Improvement <= 0.0) &&
+                            (inserts[iindex].m_Improvement + removes[rindex].m_Improvement) > 0.0 ) {
                     Movement movement;
                     movement.m_Type = E_TRANSFER;
                     movement.m_NodeId = nodeId;
@@ -289,11 +291,10 @@ namespace triforce {
                     movement.m_Improvement = inserts[iindex].m_Improvement + removes[rindex].m_Improvement;
                     retTransfers.push_back(movement);
                     movementFound = true;
+                    iindex++;
                 }
             }
             if(!movementFound) return;
-            rindex++;
-            iindex++;
         } 
     }
 
