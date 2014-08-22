@@ -607,16 +607,19 @@ namespace triforce {
                           cover.m_Communities.push_back(community);
                           community->Add(movement.m_NodeId);
                       }
+                      std::cout << "Remove" << std::endl;
                       break;
                   case E_INSERT:
                       community1 = &(cover.GetCommunity(movement.m_CommunityId1));
                       community1->Add(movement.m_NodeId);
+                      std::cout << "Insert" << std::endl;
                       break;
                   case E_TRANSFER:
                       community1 = &(cover.GetCommunity(movement.m_CommunityId1));
                       community2 = &(cover.GetCommunity(movement.m_CommunityId2));
                       community1->Remove(movement.m_NodeId);
                       community2->Add(movement.m_NodeId);
+                      std::cout << "Transfer" << std::endl;
                       break;
               };
           }
