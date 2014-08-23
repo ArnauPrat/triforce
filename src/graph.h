@@ -31,6 +31,7 @@ namespace triforce {
         if ( *(long*)a > *(long*)b ) return 1;
         if ( *(long*)a < *(long*)b ) return -1;
         if ( *(long*)a == *(long*)b ) return 0;
+		return 0;
     }
 
 		/**	@brief This class represents a graph.*/

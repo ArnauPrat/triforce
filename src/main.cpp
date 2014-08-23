@@ -72,7 +72,7 @@ int main( int argc, char** argv ) {
     double alpha = 1.0;
     double overlapp = 0.5;
 
-    for (uint32_t i = 1; i < argc; i++) {
+    for (int i = 1; i < argc; i++) {
         CHECK_ARGUMENT_STRING(i, "-f", graphFileName, graphFileNameSet)
         CHECK_ARGUMENT_STRING(i, "-o", outputFileName, outputFileNameSet)
         CHECK_ARGUMENT_FLOAT(i, "-a", alpha, alphaSet)

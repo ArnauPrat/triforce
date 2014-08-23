@@ -17,16 +17,17 @@
 #include "graph_utils.h"
 #include <algorithm>
 #include <cassert>
+#include <iterator>
 #include <cmath>
 #include <list>
 #include <set>
 
-#define LOOKAHEAD 10
+#define LOOKAHEAD 5 
 
 namespace triforce {
 
     static long MaxOverlap( long degree, double overlap ) {
-        return std::floor(overlap*static_cast<double>(degree)) + 1;
+       return static_cast<long>(std::floor(overlap*static_cast<double>(degree)) + 1);
     }
 
     double Score( const Cover& cover, double alpha, double overlap ) {
@@ -73,7 +74,7 @@ namespace triforce {
         for( long i = 0; i < graph.GetNumNodes(); ++i ) {
             long r = 0;
             for( long c : cover.m_NodeMemberships[i]) {
-                r+=cover.m_Communities[c]->size()-1;
+                r+=static_cast<long>(cover.m_Communities[c]->size()-1);
             }
             long din = 0;
             long dinPrima = 0;
@@ -87,7 +88,7 @@ namespace triforce {
                         cover.m_NodeMemberships[neighbor].begin(),
                         cover.m_NodeMemberships[neighbor].end(),
                         std::inserter(intersection, intersection.begin()));
-                long intersectionSize = intersection.size();
+                long intersectionSize = static_cast<long>(intersection.size());
                 din += static_cast<long>(intersectionSize > 0);
                 dinPrima += intersectionSize;
                 cover.m_Weights[graph.GetEdgeIndex(i,j)] = intersectionSize;
@@ -151,7 +152,7 @@ namespace triforce {
             if(!visited[nodeId]) {
                 visited[nodeId] = true;
                 cover.m_Communities.push_back(new std::set<long>());
-                long communityId = cover.m_Communities.size() - 1;
+                long communityId = static_cast<long>(cover.m_Communities.size() - 1);
                 cover.m_Communities[communityId]->insert(nodeId);
                 cover.m_NodeMemberships[nodeId].insert(communityId);
                 const  long* adjacencies = graph.GetNeighbors(nodeId);
@@ -280,7 +281,7 @@ namespace triforce {
         std::sort( removes.begin(), removes.end(), CompareMovement );
         std::sort( inserts.begin(), inserts.end(), CompareMovement );
         long rindex = 0, iindex = 0;
-        long slots = MaxOverlap(degree,overlap) - cover.m_NodeMemberships[nodeId].size();
+        long slots = MaxOverlap(degree,overlap) - static_cast<long>(cover.m_NodeMemberships[nodeId].size());
         while( ( (rindex < removes.size()) && (removes[rindex].m_Improvement != 0.0)) || (iindex < inserts.size() && (inserts[iindex].m_Improvement != 0.0))) {
             bool movementFound = false;
             if( rindex < removes.size() && removes[rindex].m_Improvement > 0.0 ) {
@@ -366,7 +367,7 @@ namespace triforce {
                         cover.m_NodeMemberships[i].insert(community);
                     } else {
                         cover.m_Communities.push_back(new std::set<long>());
-                        long community = cover.m_Communities.size() - 1;
+                        long community = static_cast<long>(cover.m_Communities.size() - 1);
                         cover.m_Communities[community]->insert(i);
                         cover.m_NodeMemberships[i].insert(community);
                     }
