@@ -50,7 +50,7 @@ namespace triforce {
 
     void Print( const Cover& cover, std::ostream& stream ) {
         const Graph& graph = *cover.m_Graph;
-        for( long i = 0; i < cover.m_Communities.size(); ++i ) {
+        for( unsigned long i = 0; i < cover.m_Communities.size(); ++i ) {
             const std::set<long>& nodes = *cover.m_Communities[i];
             if( nodes.size() > 0 ) {
                 for( long n : nodes ) {
@@ -306,6 +306,118 @@ namespace triforce {
         } 
     }
 
+
+    double TestMerge( const Cover& cover, const long communityId1, const long communityId2, double alpha, double overlap ) {
+
+        const Graph& graph = *cover.m_Graph;
+        const std::set<long>& community1 = *cover.m_Communities[communityId1];
+        const std::set<long>& community2 = *cover.m_Communities[communityId2];
+        double improvement = 0.0;
+        for( long nodeId1 : community1 ) {
+            double din = 0;
+            double dinPrima = 0;
+            for( long nodeId2 : community2 ) {
+                long pos = graph.HasNeighbor( nodeId1, nodeId2 );
+                if( pos != -1 ) {
+                    long index = graph.GetEdgeIndex( nodeId1, pos );
+                    if( cover.m_Weights[index] == 0 ) {
+                        din++;
+                    }
+                    dinPrima++;
+                }
+            }
+            double denominator = cover.m_Graph->GetDegree(nodeId1) + alpha*(cover.m_MembershipStats[nodeId1].m_R + cover.m_Communities[communityId2]->size() - (cover.m_MembershipStats[nodeId1].m_DinPrima + dinPrima));
+            double newScore = denominator > 0 ? (cover.m_MembershipStats[nodeId1].m_Din + din) / denominator : 0.0;
+            improvement += newScore - cover.m_MembershipStats[nodeId1].m_Score;
+        }
+
+        for( long nodeId1 : community2 ) {
+            double din = 0;
+            double dinPrima = 0;
+            for( long nodeId2 : community1 ) {
+                long pos = graph.HasNeighbor( nodeId1, nodeId2 );
+                if( pos != -1 ) {
+                    long index = graph.GetEdgeIndex( nodeId1, pos );
+                    if( cover.m_Weights[index] == 0 ) {
+                        din++;
+                    }
+                    dinPrima++;
+                }
+            }
+            double denominator = cover.m_Graph->GetDegree(nodeId1) + alpha*(cover.m_MembershipStats[nodeId1].m_R + cover.m_Communities[communityId1]->size() - (cover.m_MembershipStats[nodeId1].m_DinPrima + dinPrima));
+            double newScore = denominator > 0 ? (cover.m_MembershipStats[nodeId1].m_Din + din) / denominator : 0.0;
+            improvement += newScore - cover.m_MembershipStats[nodeId1].m_Score;
+        }
+        return improvement;
+    }
+
+    struct CommunityMerge {
+        long m_CommunityId1;
+        long m_CommunityId2;
+        long m_Improvement;
+    };
+
+    static bool CompareCommunityMerge( const CommunityMerge& a, const CommunityMerge& b ) {
+        return a.m_Improvement < b.m_Improvement;
+    }
+
+    static void MergeCommunities( Cover& cover, double alpha, double overlapp ) {
+        const Graph& graph = *cover.m_Graph;
+        std::set<std::tuple<long,long> > mergeTries;
+        long numNodes = graph.GetNumNodes();
+        for( long i = 0; i < numNodes; ++i ) {
+            const std::set<long>& communities = cover.m_NodeMemberships[i];
+            const long* adjacencies = graph.GetNeighbors(i);
+            long degree = graph.GetDegree(i);
+            for( long j = 0; j < degree; ++j ) {
+                long neighbor = adjacencies[j];
+                if( i < neighbor ) {
+                    const std::set<long>& nCommunities = cover.m_NodeMemberships[neighbor];
+                    for( auto it = communities.begin(); it != communities.end(); ++it ) {
+                        for( auto it2 = nCommunities.begin(); it2 != nCommunities.end(); ++it2 ) {
+                            if(*it != *it2 ) {
+                                mergeTries.insert(std::tuple<long,long>(*it, *it2));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        std::vector<CommunityMerge> merges;
+        for( std::tuple<long,long> t : mergeTries ) {
+            long c1 = std::get<0>(t);
+            long c2 = std::get<1>(t);
+            if( cover.m_Communities[c1]->size() != 0 && cover.m_Communities[c2]->size() != 0 ) {
+                double improvement = TestMerge( cover, c1, c2, alpha, overlapp );
+                if( improvement > 0.0 ) {
+                    CommunityMerge merge;
+                    merge.m_CommunityId1 = c1;
+                    merge.m_CommunityId2 = c2;
+                    merge.m_Improvement = improvement;
+                    merges.push_back(merge);
+                }
+            }
+        }
+        std::sort(merges.begin(), merges.end(), CompareCommunityMerge );
+        std::set<long> touched;
+        for( CommunityMerge m : merges ) {
+            if( touched.find(m.m_CommunityId1) == touched.end() &&
+                    touched.find(m.m_CommunityId2) == touched.end() ) {
+                std::set<long>& community1 = *cover.m_Communities[m.m_CommunityId1];
+                std::set<long>& community2 = *cover.m_Communities[m.m_CommunityId2];
+                for( long n : community2 ) {
+                    cover.m_NodeMemberships[n].erase(m.m_CommunityId2);
+                    cover.m_NodeMemberships[n].insert(m.m_CommunityId1);
+                }
+                community1.insert(community2.begin(), community2.end());
+                community2.clear();
+                touched.insert(m.m_CommunityId1);
+                touched.insert(m.m_CommunityId2);
+            }
+        }
+    }
+
     void RefineCommunities( Cover& cover, double alpha, double overlap ) {
         long bestCoverSize = 0;
         Cover* bestCover = Create(cover.m_Graph);
@@ -368,6 +480,15 @@ namespace triforce {
             currentScore = Score(cover, alpha, overlap );
             std::cout << "New Score " << currentScore << std::endl;
             double diff = currentScore - bestScore;
+            if( diff <= 0.001) {
+                std::cout << "Movements did not improve, trying merges " << std::endl;
+                MergeCommunities(cover, alpha, overlap);
+                ComputeMembershipStats(cover,alpha);
+                currentScore = Score(cover, alpha, overlap );
+                std::cout << "New Score after merging " << currentScore << std::endl;
+                diff = currentScore - bestScore;
+            } 
+            
             if( diff > 0.001) {
                 std::cout << "Cover Improved" << std::endl;
                 Destroy(bestCover);
@@ -375,7 +496,7 @@ namespace triforce {
                 Copy(*bestCover,cover);
                 bestScore = currentScore;
                 lookahead = LOOKAHEAD;
-            } 
+            }
         }        
         Copy(cover,*bestCover);
     }
