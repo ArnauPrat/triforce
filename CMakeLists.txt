@@ -12,10 +12,16 @@
 #along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.2)
-PROJECT(SCD CXX)
-SET(CMAKE_CXX_FLAGS_DEBUG "-O0 -std=c++11 -g -pg -fopenmp -DPROFILE ")	
-SET(CMAKE_CXX_FLAGS_RELEASE "-O3 -std=c++11 -fopenmp -DNDEBUG")	
-#SET(CMAKE_VERBOSE_MAKEFILE ON)
+PROJECT(triforce CXX)
+IF( UNIX )
+	SET(CMAKE_CXX_FLAGS_DEBUG "-O0 -std=c++11 -g -pg -fopenmp -DPROFILE -Wall")	
+	SET(CMAKE_CXX_FLAGS_RELEASE "-O3 -std=c++11 -fopenmp -DNDEBUG -Wall ")	
+ENDIF(UNIX)
+
+IF( WIN32 )
+	SET(CMAKE_CXX_FLAGS_DEBUG "/Od /openmp /W3")	
+	SET(CMAKE_CXX_FLAGS_RELEASE "/O2 /openmp /Oi /Ot /Og /W3")	
+ENDIF( WIN32 )
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "Setting build type to 'Release' as none was specified.")
