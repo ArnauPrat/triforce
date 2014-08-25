@@ -61,14 +61,6 @@ namespace triforce {
         }
     }
 
-    double TestRemove( const Cover& cover, const long nodeId, const long community, double alpha, double overlapp) {
-        return 0.0; 
-    }
-
-    double TestInsert( const Cover& cover, const long nodeId, const long comunity, double alpha, double overlapp) {
-        return 0.0;
-    }
-
     static void ComputeMembershipStats( Cover& cover, double alpha ) {
         const Graph& graph = *cover.m_Graph;
         for( long i = 0; i < graph.GetNumNodes(); ++i ) {
@@ -107,12 +99,6 @@ namespace triforce {
 
             denominator = graph.GetDegree(i) + alpha*( r-1 - (dinPrima-1)) ;
             cover.m_MembershipStats[i].m_ConnectedRemove = denominator > 0 ? (din-1) / denominator : 0.0;
-            /*std::cout << " r " << r << std::endl;
-            std::cout << " degree " << degree << std::endl;
-            std::cout << " din " << din << std::endl;
-            std::cout << " dinPrima " << dinPrima << std::endl;
-            std::cout << " score " << cover.m_MembershipStats[i].m_Score << std::endl;
-            std::cout << " connected remove " << cover.m_MembershipStats[i].m_ConnectedRemove << std::endl;*/
             cover.m_MembershipStats[i].m_ConnectedRemove -= cover.m_MembershipStats[i].m_Score;
 
             denominator = graph.GetDegree(i) + alpha*( r-1 - dinPrima) ;
@@ -168,12 +154,7 @@ namespace triforce {
             }   
         }   
         
-        /*for( int i = 0; i < cover.m_Graph->GetNumNodes(); ++i ) {
-            cover.m_Communities[0]->insert(i);
-            cover.m_NodeMemberships[i].insert(0);
-        } 
-        */
-        ComputeMembershipStats(cover, alpha);
+       ComputeMembershipStats(cover, alpha);
     }
 
     enum MovementType {
@@ -194,58 +175,35 @@ namespace triforce {
         return a.m_Improvement < b.m_Improvement;
     }
 
-    static void PerformMovements( Cover& cover, const long nodeId, double alpha, double overlap, double bestScore, std::vector<Movement>& retRemoves, std::vector<Movement>& retInserts, std::vector<Movement>& retTransfers ) {
-        std::vector<Movement> removes;
-        const long* adjacencies = cover.m_Graph->GetNeighbors(nodeId);
-        for( long c : cover.m_NodeMemberships[nodeId] ) {
-            double increment = 0.0;
-            long dinLost = 0;
-            long dinPrimaLost = 0;
-            for( long n : *cover.m_Communities[c] ) {
-                long pos = cover.m_Graph->HasNeighbor(nodeId,n);
-                if( pos != -1 ) {
-                    long edgeIndex = cover.m_Graph->GetEdgeIndex(nodeId, pos);
-                    if( cover.m_Weights[edgeIndex] == 1 ) {
-                        increment+=cover.m_MembershipStats[n].m_ConnectedRemove;
-                        dinLost++;
-                    }
-                    dinPrimaLost++;
-                } else {
-                    increment+=cover.m_MembershipStats[n].m_NotConnectedRemove;
+    double TestRemove( const Cover& cover, const long nodeId, const long community, double alpha, double overlapp) {
+        double increment = 0.0;
+        long dinLost = 0;
+        long dinPrimaLost = 0;
+        for (long n : *cover.m_Communities[community]) {
+            long pos = cover.m_Graph->HasNeighbor(nodeId, n);
+            if (pos != -1) {
+                long edgeIndex = cover.m_Graph->GetEdgeIndex(nodeId, pos);
+                if (cover.m_Weights[edgeIndex] == 1) {
+                    increment += cover.m_MembershipStats[n].m_ConnectedRemove;
+                    dinLost++;
                 }
+                dinPrimaLost++;
             }
-            double denominator = cover.m_Graph->GetDegree(nodeId) + alpha*(cover.m_MembershipStats[nodeId].m_R-cover.m_Communities[c]->size() - (cover.m_MembershipStats[nodeId].m_DinPrima - dinPrimaLost));
-            double newScore = denominator > 0 ?  (cover.m_MembershipStats[nodeId].m_Din - dinLost) / denominator : 0.0;
-            increment += newScore - cover.m_MembershipStats[nodeId].m_Score;
-            if( removes.size() == 0 ) {
-                Movement movement;
-                movement.m_Type = E_REMOVE;
-                movement.m_NodeId = nodeId;
-                movement.m_CommunityId1 = c;
-                movement.m_Improvement = increment;
-                removes.push_back(movement);
-            } else if( removes[0].m_Improvement < increment ) {
-                removes[0].m_NodeId = nodeId;
-                removes[0].m_CommunityId1 = c;
-                removes[0].m_Improvement = increment;
+            else {
+                increment += cover.m_MembershipStats[n].m_NotConnectedRemove;
             }
         }
+        double denominator = cover.m_Graph->GetDegree(nodeId) + alpha*(cover.m_MembershipStats[nodeId].m_R - cover.m_Communities[community]->size() - (cover.m_MembershipStats[nodeId].m_DinPrima - dinPrimaLost));
+        double newScore = denominator > 0 ? (cover.m_MembershipStats[nodeId].m_Din - dinLost) / denominator : 0.0;
+        increment += newScore - cover.m_MembershipStats[nodeId].m_Score;
+        return increment;
+    }
 
-        std::vector<Movement> inserts;
-        std::set<long> candidates;
-        long degree = cover.m_Graph->GetDegree(nodeId);
-        for( long i = 0; i < degree; ++i ) {
-            long neighbor = adjacencies[i];
-            for( long c : cover.m_NodeMemberships[neighbor] ) {
-                candidates.insert(c);
-            }
-        }
-//        std::cout << cover.m_Graph->ReMap(nodeId) << " " << candidates.size() << std::endl;
-        for( long c : candidates ) {
+    double TestInsert( const Cover& cover, const long nodeId, const long community, double alpha, double overlapp) {
             double increment = 0.0;
             long dinAdded = 0;
             long dinPrimaAdded = 0;
-            for( long n : *cover.m_Communities[c] ) {
+            for( long n : *cover.m_Communities[community] ) {
                 long pos = cover.m_Graph->HasNeighbor(nodeId,n);
                 if( pos != -1 ) {
                     long edgeIndex = cover.m_Graph->GetEdgeIndex(nodeId, pos);
@@ -258,28 +216,62 @@ namespace triforce {
                     increment+=cover.m_MembershipStats[n].m_NotConnectedAdd;
                 }
             }
-            double denominator = cover.m_Graph->GetDegree(nodeId) + alpha*(cover.m_MembershipStats[nodeId].m_R+cover.m_Communities[c]->size() - (cover.m_MembershipStats[nodeId].m_DinPrima + dinPrimaAdded));
+            double denominator = cover.m_Graph->GetDegree(nodeId) + alpha*(cover.m_MembershipStats[nodeId].m_R+cover.m_Communities[community]->size() - (cover.m_MembershipStats[nodeId].m_DinPrima + dinPrimaAdded));
             double newScore = denominator > 0 ?  (cover.m_MembershipStats[nodeId].m_Din + dinAdded) / denominator : 0.0;
             increment += newScore - cover.m_MembershipStats[nodeId].m_Score;
-//            std::cout << cover.m_Graph->ReMap(nodeId) << " " << c << " " << increment << std::endl;
-            if( increment > 0.0 ) {
+        return increment;
+    }
+
+
+    static void PerformMovements( Cover& cover, const long nodeId, double alpha, double overlap, double bestScore, std::vector<Movement>& retRemoves, std::vector<Movement>& retInserts, std::vector<Movement>& retTransfers ) {
+        std::vector<Movement> removes;
+        const long* adjacencies = cover.m_Graph->GetNeighbors(nodeId);
+        for( long c : cover.m_NodeMemberships[nodeId] ) {
+            double improvement = TestRemove(cover, nodeId, c, alpha, overlap);
+            if( removes.size() == 0 ) {
+                Movement movement;
+                movement.m_Type = E_REMOVE;
+                movement.m_NodeId = nodeId;
+                movement.m_CommunityId1 = c;
+                movement.m_Improvement = improvement;
+                removes.push_back(movement);
+            } else if( removes[0].m_Improvement < improvement ) {
+                removes[0].m_NodeId = nodeId;
+                removes[0].m_CommunityId1 = c;
+                removes[0].m_Improvement = improvement;
+            }
+        }
+
+        std::vector<Movement> inserts;
+        std::set<long> candidates;
+        long degree = cover.m_Graph->GetDegree(nodeId);
+        for( long i = 0; i < degree; ++i ) {
+            long neighbor = adjacencies[i];
+            for( long c : cover.m_NodeMemberships[neighbor] ) {
+                candidates.insert(c);
+            }
+        }
+
+        for( long c : candidates ) {
+            double improvement = TestInsert(cover, nodeId, c, alpha, overlap);
+            if( improvement > 0.0 ) {
                 if( inserts.size() == 0 ) {
                     Movement movement;
                     movement.m_Type = E_INSERT;
                     movement.m_NodeId = nodeId;
                     movement.m_CommunityId1 = c;
-                    movement.m_Improvement = increment;
+                    movement.m_Improvement = improvement;
                     inserts.push_back(movement);
-                } else if( inserts[0].m_Improvement < increment ) {
+                } else if( inserts[0].m_Improvement < improvement ) {
                     inserts[0].m_NodeId = nodeId;
                     inserts[0].m_CommunityId1 = c;
-                    inserts[0].m_Improvement = increment;
+                    inserts[0].m_Improvement = improvement;
                 }
             }
         }
 
-        std::sort( removes.begin(), removes.end(), CompareMovement );
-        std::sort( inserts.begin(), inserts.end(), CompareMovement );
+        std::sort(removes.begin(), removes.end(), CompareMovement);
+        std::sort(inserts.begin(), inserts.end(), CompareMovement);
         long rindex = 0, iindex = 0;
         long slots = MaxOverlap(degree,overlap) - static_cast<long>(cover.m_NodeMemberships[nodeId].size());
         while( ( (rindex < removes.size()) && (removes[rindex].m_Improvement != 0.0)) || (iindex < inserts.size() && (inserts[iindex].m_Improvement != 0.0))) {
@@ -334,13 +326,11 @@ namespace triforce {
             for( Movement& movement : removes ) {
                 cover.m_Communities[movement.m_CommunityId1]->erase(movement.m_NodeId);
                 cover.m_NodeMemberships[movement.m_NodeId].erase(movement.m_CommunityId1);
-            //    std::cout << "Remove " << cover.m_Graph->ReMap(movement.m_NodeId) << " from " << movement.m_CommunityId1 << " with new size " << cover.m_Communities[movement.m_CommunityId1]->size() << std::endl;
             }
 
             for( Movement& movement : inserts ) {
                 cover.m_Communities[movement.m_CommunityId1]->insert(movement.m_NodeId);
                 cover.m_NodeMemberships[movement.m_NodeId].insert(movement.m_CommunityId1);
-             //   std::cout << "Insert " << cover.m_Graph->ReMap(movement.m_NodeId) << " to " << movement.m_CommunityId1 << std::endl;
             }
 
             for( Movement& movement : transfers ) {
@@ -348,7 +338,6 @@ namespace triforce {
                 cover.m_NodeMemberships[movement.m_NodeId].erase(movement.m_CommunityId1);
                 cover.m_Communities[movement.m_CommunityId2]->insert(movement.m_NodeId);
                 cover.m_NodeMemberships[movement.m_NodeId].insert(movement.m_CommunityId2);
-              //  std::cout << "Transfer " << cover.m_Graph->ReMap(movement.m_NodeId) << " from " << movement.m_CommunityId1 << " to " << movement.m_CommunityId2 << std::endl;
             }
 
             std::list<long> slots;
