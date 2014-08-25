@@ -1,317 +1,114 @@
 /*Triforce is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-Triforce is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+  Triforce is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
 
 #include "cover_utils.h"
-#include "graph_utils.h"
 #include "graph.h"
-#include <set>
+#include "graph_utils.h"
 #include <algorithm>
-#include <cfloat>
+#include <cassert>
+#include <iterator>
+#include <cmath>
+#include <list>
+#include <set>
 
 #define LOOKAHEAD 5 
 
 namespace triforce {
 
-    bool ValidOverlapp( const Cover& cover,  long nodeId, double overlapp ) {
-        /*const std::set< long>& communities = cover.NodeCommunities( nodeId );        
-        for( auto it1 = communities.begin(); it1 != communities.end(); ++it1 ) {
-            for( auto it2 = communities.begin(); it2 != communities.end(); ++it2 ) {
-                if( *it1 != *it2 && Similar(cover, cover.GetCommunity(*it1), cover.GetCommunity(*it2), overlapp)) {
-                    return false; 
-                }
+    static long MaxOverlap( long degree, double overlap ) {
+       return static_cast<long>(std::floor(overlap*static_cast<double>(degree)) + 1);
+    }
+
+    double Score( const Cover& cover, double alpha, double overlap ) {
+        double score = 0.0;
+        for( long i = 0; i < cover.m_Graph->GetNumNodes(); ++i ) {
+            score+=Score(cover,i,alpha,overlap); 
+            if(cover.m_NodeMemberships[i].size() > MaxOverlap(cover.m_Graph->GetDegree(i),overlap)  ) {
+                std::cout << "ENTRA" << std::endl;
+                std::cout << i << " " << cover.m_NodeMemberships[i].size() << " " << cover.m_Graph->GetDegree(i) << std::endl;
+                return 0.0;
             }
         }
-        return true;
-        */
-        const Graph& graph = cover.GetGraph();
-        long degree = graph.GetDegree(nodeId);
-        return ((cover.NumNodeCommunities(nodeId)-1) / (double)degree) <= overlapp;
+        return score / cover.m_Graph->GetNumNodes();
     }
 
-    bool CanOverlapMore( const Cover& cover, const long nodeId, double overlapp ) {
-        const Graph& graph = cover.GetGraph();
-        long degree = graph.GetDegree(nodeId);
-        return ((cover.NumNodeCommunities(nodeId)) / (double)degree) <= overlapp;
+    double Score( const Cover& cover,  long nodeId, double alpha, double overlap) {
+        return cover.m_MembershipStats[nodeId].m_Score;
     }
 
-    bool Similar( const Cover& cover, const Cover::Community& communityA, const Cover::Community& communityB, double overlapp ) {
-        const std::set< long>& nodesA = communityA.Nodes();
-        const std::set< long>& nodesB = communityB.Nodes();
-        auto it1 = nodesA.begin();
-        auto it2 = nodesB.begin();
-         long common = 0;
-        while( (it1 != nodesA.end()) && (it2 != nodesB.end()) ) { 
-            if( *it1 < *it2 ) { 
-               ++it1; 
-            }   
-            else if( *it1 > *it2 ) { 
-                ++it2;
-            } else {
-                common++;
-                ++it1;
-                ++it2;
-            }   
-        }   
-        //long common = cover.m_CommunityMatrix.Get(communityA.Id(), communityB.Id());
-        return (common / (double)( std::min(communityA.Size(), communityB.Size()))) > overlapp;
-    }
-
-    double Score( const Cover& cover,  long nodeId, double alpha, double overlapp, bool& validOverlapp ) {
-        const Graph& graph = cover.GetGraph();
-        if( ValidOverlapp( cover, nodeId, overlapp ) ) {
-            std::set< long> unionSet = CommunityUnion( cover, nodeId );
-            const  long* adjacencies = graph.GetNeighbors( nodeId );
-             long degree = graph.GetDegree( nodeId );
-             long kin = 0;
-             long kout = 0;
-            for(  long i = 0; i < degree; ++i ) {
-                if( unionSet.find(adjacencies[i]) != unionSet.end() ) {
-                    kin++;
-                } else {
-                    kout++;
-                }
-            }
-            long denom = kout + unionSet.size() - 1;
-            validOverlapp = true;
-            if( denom == 0 ) return 0.0;
-            return kin /(double)( kout + kin + alpha*(unionSet.size()-kin - 1));
-        }
-        validOverlapp = false;
-        return 0.0;
-    }
-
-    double Score( const Cover& cover, double alpha, double overlapp ) {
-        const Graph& graph = cover.GetGraph();
-        long numNodes = graph.GetNumNodes();
-        double sum = 0;
-        for(  long i = 0; i < numNodes; ++i ) {
-            bool validOverlapp;
-            double aux = Score( cover, i, alpha, overlapp, validOverlapp );
-            if(!validOverlapp) return 0.0;
-            sum += aux;
-        }
-        return sum / (double)numNodes;
-    }
-
-    std::set< long> CommunityUnion( const Cover& cover, 
-                                            const  long nodeId ) {
-        std::set< long> unionSet;
-        const std::set< long>& communities = cover.NodeCommunities( nodeId );        
-        for( auto it1 = communities.begin(); it1 != communities.end(); ++it1 ) {
-            const std::set< long>& communityNodes = cover.GetCommunity(*it1).Nodes();
-            for( auto it2 = communityNodes.begin(); it2 != communityNodes.end(); ++it2) {
-                unionSet.insert(*it2);
-            }
-        }
-        return unionSet;
-    }
 
     void Print( const Cover& cover, std::ostream& stream ) {
-        const Graph& graph = cover.GetGraph();
-        for( long i = 0; i < cover.NumCommunities(); ++i ) {
-            const Cover::Community& community = cover.GetCommunity(i);
-            if( community.Size() > 0 ) {
-                const std::set<long>& nodes = community.Nodes();
-                for( auto it = nodes.begin(); it != nodes.end(); ++it ) {
-                    stream << graph.ReMap(*it) << " ";
+        const Graph& graph = *cover.m_Graph;
+        for( unsigned long i = 0; i < cover.m_Communities.size(); ++i ) {
+            const std::set<long>& nodes = *cover.m_Communities[i];
+            if( nodes.size() > 0 ) {
+                for( long n : nodes ) {
+                    stream << graph.ReMap(n) << " ";
                 } 
                 stream << std::endl;
             }
         }
     }
 
-    void PrintZero( const Cover& cover, std::ostream& stream, double alpha, double overlapp ) {
-        const Graph& graph = cover.GetGraph();
-         long numNodes = graph.GetNumNodes();
-        double sum = 0;
-        for(  long i = 0; i < numNodes; ++i ) {
-            bool validOverlapp;
-            double aux = Score( cover, i, alpha, overlapp, validOverlapp );
-            if( aux == 0.0 ) stream << graph.ReMap(i) << " has score zero" << std::endl;;
-        }
-    }
-
-    static double CheckForIncrement( long r, long din, long dout, long cout, double pin, double alpha ) {
-//        std::cout << "Size: " << r << " din:  "<< din  << " dout: " << dout << " cout: " << cout << " pin " << pin << " alpha " << alpha << std::endl;
-        double avgKout;
-        double avgKin;
-        if (r > 0) {
-            avgKout = (cout - din) / (double) r;
-            avgKin = (r-1)*pin; 
-        } else {
-            avgKout = 0.0;
-            avgKin = 0.0;
-        }
-        double A = 0.0;
-        double denom1 = avgKout + dout + avgKin + alpha*(r-1-avgKin);
-        double denom2 = avgKout + 1 + avgKin + alpha*(r-1-avgKin);
-        if (denom1 != 0.0 ) {
-            A = (avgKin+1) / denom1;
-        }
-        if(denom2 != 0.0) {
-            A -= (avgKin) / denom2;
-        }
-        double B = 0.0;
-        denom1 = avgKout + avgKin + alpha*(r-avgKin);
-        denom2 = avgKout + avgKin + alpha*(r-avgKin -1);
-        if (denom1 != 0.0) {
-            B = avgKin / denom1;
-        }
-        if (denom2 != 0.0) {
-            B -= avgKin / denom2;
-        }
-
-        double C = 0.0;
-        denom1 = dout + din + alpha*(r-1);;
-        if (denom1 != 0.0 ) {
-            C = din/denom1;
-        }
-        double res = (A*din + (r - din)*B + C);
-        return res;
-    }
-
-    double TestRemove( const long nodeId, const Cover::Community& community, double alpha, double overlapp, bool& validOverlapp) {
-        const Cover& cover = community.GetCover();
-        const Graph& graph = community.GetGraph(); 
-        Cover::Community& comAux = const_cast<Cover::Community&>(community);
-/*        const long* adjacencies = graph.GetNeighbors(nodeId);
-        long degree = graph.GetDegree(nodeId);
-        long din = 0;
-        long dout = 0;
-        std::set<long> inNeighbors;
-        for( long i = 0; i < degree; ++i ) {
-            long neighbor = adjacencies[i];
-            if( community.Contains(neighbor) ) {
-                din++;
-                inNeighbors.insert(neighbor);
-            } else {
-                dout++;
+    static void ComputeMembershipStats( Cover& cover, double alpha ) {
+        const Graph& graph = *cover.m_Graph;
+        for( long i = 0; i < graph.GetNumNodes(); ++i ) {
+            long r = 0;
+            for( long c : cover.m_NodeMemberships[i]) {
+                r+=static_cast<long>(cover.m_Communities[c]->size()-1);
             }
-        }
-        */
-        double before = 0.0;
-        double after = 0.0;
-        long r = community.Size();
-        bool tempValidOverlapp;
-        bool violatesOverlapp = false;
-        std::set<long> nodes = community.Nodes();
-        for( auto it = nodes.begin(); it != nodes.end(); ++it ) {
-            before += Score( cover, *it, alpha, overlapp, tempValidOverlapp );
-            violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
-        }
-        if( violatesOverlapp ) before = 0.0;
-
-        comAux.Remove(nodeId);
-        nodes = community.Nodes();
-        violatesOverlapp = false;
-        for( auto it = nodes.begin(); it != nodes.end(); ++it ) {
-            after += Score( cover, *it, alpha, overlapp, tempValidOverlapp );
-            violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
-        }
-        after += Score( cover, nodeId, alpha, overlapp, tempValidOverlapp );
-        violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
-        if( violatesOverlapp ) {
-            validOverlapp = false;
-        } else {
-            validOverlapp = true;
-        }
-        comAux.Add(nodeId);
-        /*double pin = ((community.GetInternalEdges()-din)*2)/(double)((community.Size()-1)*(community.Size()-2));
-        double increment = CheckForIncrement( community.Size() - 1, din, dout, community.GetExternalEdges()-dout+din, pin, alpha);
-        */
-        //return  (after - before)/graph.GetNumNodes();
-        return  (after - before);
-    }
-
-    double TestInsert( const long nodeId, const Cover::Community& community, double alpha, double overlapp, bool& validOverlapp ) {
-        const Cover& cover = community.GetCover();
-        const Graph& graph = community.GetGraph(); 
-        Cover::Community& comAux = const_cast<Cover::Community&>(community);
-        /*const long* adjacencies = graph.GetNeighbors(nodeId);
-        long degree = graph.GetDegree(nodeId);
-        long din = 0;
-        long dout = 0;
-        for( long i = 0; i < degree; ++i ) {
-            long neighbor = adjacencies[i];
-            if( community.Contains(neighbor) ) {
-                din++;
-            } else {
-                dout++;
+            long din = 0;
+            long dinPrima = 0;
+            const long* adjacencies = graph.GetNeighbors(i);
+            long degree = graph.GetDegree(i);
+            for( long j = 0; j < degree; ++j ) {
+                long neighbor = adjacencies[j];
+                std::set<long> intersection;
+                std::set_intersection(cover.m_NodeMemberships[i].begin(),
+                        cover.m_NodeMemberships[i].end(),
+                        cover.m_NodeMemberships[neighbor].begin(),
+                        cover.m_NodeMemberships[neighbor].end(),
+                        std::inserter(intersection, intersection.begin()));
+                long intersectionSize = static_cast<long>(intersection.size());
+                din += static_cast<long>(intersectionSize > 0);
+                dinPrima += intersectionSize;
+                cover.m_Weights[graph.GetEdgeIndex(i,j)] = intersectionSize;
             }
-        }
-        double increment = CheckForIncrement( community.Size(), din, dout, community.GetInternalEdges()*2/(double)((community.Size())*(community.Size() -1)),community.GetExternalEdges(), alpha);
-        */
 
-        double before = 0.0;
-        double after = 0.0;
-        bool tempValidOverlapp;
-        bool violatesOverlapp = false;
-        std::set<long> nodes = comAux.Nodes();
-        for( auto it = nodes.begin(); it != nodes.end(); ++it ) {
-            before += Score( cover, *it, alpha, overlapp, tempValidOverlapp );
-            violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
-        }
-        before += Score( cover, nodeId, alpha, overlapp, tempValidOverlapp );
-        violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
-        if( violatesOverlapp ) before = 0.0;
-        
-        violatesOverlapp = false;
-        comAux.Add(nodeId);
-        nodes = comAux.Nodes();
-        for( auto it = nodes.begin(); it != nodes.end(); ++it ) {
-            after += Score( cover, *it, alpha, overlapp, tempValidOverlapp );
-            violatesOverlapp = violatesOverlapp || !tempValidOverlapp;
-        }
-        comAux.Remove(nodeId);
-        if( violatesOverlapp ) {
-            validOverlapp = false;
-        } else {
-            validOverlapp = true;
-        }
+            double denominator = graph.GetDegree(i) + alpha*( r - (dinPrima)) ;
+            cover.m_MembershipStats[i].m_Score = denominator > 0.0 ? din / denominator : 0.0;
 
-        //return (after/graph.GetNumNodes()) - (before/graph.GetNumNodes());
-        return (after) - (before);
-    }
+            denominator = graph.GetDegree(i) + alpha*( r+1 - (dinPrima+1)) ;
+            cover.m_MembershipStats[i].m_ConnectedAdd = denominator > 0 ? (din+1) / denominator : 0.0;
+            cover.m_MembershipStats[i].m_ConnectedAdd -= cover.m_MembershipStats[i].m_Score;
 
-    bool ViolatesOverlappInsert( const long nodeId, const Cover::Community& community) {
-/*        const Cover& cover = community.GetCover(); 
-        const std::set<long>& nodeCommunities = cover.NodeCommunities( nodeId ); 
-        for( auto it = nodeCommunities.begin(); it != nodeCommunities.end(); ++it ) {
-            const Cover::Community& communityB = cover.GetCommunity(*it);
-            long common = cover.m_CommunityMatrix.Get( community.Id(), communityB.Id() );
-            if( (common + 1)/ ((double) community.Size() + communityB.Size() + 1) > OVERLAPPING_THRESHOLD &&
-                (common)/ ((double) community.Size() + communityB.Size()) <= OVERLAPPING_THRESHOLD ) {
-                return true;
-            }
-        }
-        */
-        return false;
-    }
+            denominator = graph.GetDegree(i) + alpha*( r+1 - dinPrima) ;
+            cover.m_MembershipStats[i].m_NotConnectedAdd = denominator > 0 ? (din) / denominator : 0.0;
+            cover.m_MembershipStats[i].m_NotConnectedAdd -= cover.m_MembershipStats[i].m_Score;
 
-    bool ViolatesOverlappRemove( const long nodeId, const Cover::Community& community) {
-        /*const Cover& cover = community.GetCover(); 
-        const std::set<long>& nodeCommunities = cover.NodeCommunities( nodeId ); 
-        for( auto it = nodeCommunities.begin(); it != nodeCommunities.end(); ++it ) {
-            const Cover::Community& communityB = cover.GetCommunity(*it);
-            long common = cover.m_CommunityMatrix.Get( community.Id(), communityB.Id() );
-            if( (common - 1)/ ((double) community.Size() + communityB.Size() - 1) <= OVERLAPPING_THRESHOLD &&
-                (common)/ ((double) community.Size() + communityB.Size()) > OVERLAPPING_THRESHOLD ) {
-                return false;
-            }
-        }
-        */
-        return true;
+            denominator = graph.GetDegree(i) + alpha*( r-1 - (dinPrima-1)) ;
+            cover.m_MembershipStats[i].m_ConnectedRemove = denominator > 0 ? (din-1) / denominator : 0.0;
+            cover.m_MembershipStats[i].m_ConnectedRemove -= cover.m_MembershipStats[i].m_Score;
+
+            denominator = graph.GetDegree(i) + alpha*( r-1 - dinPrima) ;
+            cover.m_MembershipStats[i].m_NotConnectedRemove = denominator > 0 ? (din) / denominator : 0.0;
+            cover.m_MembershipStats[i].m_NotConnectedRemove -= cover.m_MembershipStats[i].m_Score;
+
+            cover.m_MembershipStats[i].m_R = r;
+            cover.m_MembershipStats[i].m_Din = din;
+            cover.m_MembershipStats[i].m_DinPrima = dinPrima;
+        } 
     }
 
     /** @brief Compares two node clustering.
@@ -319,14 +116,12 @@ namespace triforce {
      *  @param b The second tuple to sort.   
      *  @return -1 if a goes before b. 1 if a goes after b. 0 if a and b are equal.*/
     static bool CompareClusterings(const std::tuple<long, double,long >& a, const std::tuple<long, double, long> b) {
-        //return std::tie( std::get<1>(a), std::get<2>(a) ) < std::tie( std::get<1>(b), std::get<2>(b) ) ;
-        //return std::tie( std::get<2>(a), std::get<1>(a) ) < std::tie( std::get<2>(b), std::get<1>(b) ) ;
         return std::tie( std::get<1>(a), std::get<2>(a) ) > std::tie( std::get<1>(b), std::get<2>(b) ) ;
     }
 
-    void Initialize( Cover& cover, double alpha, double overlapp ) {
-
-        const Graph& graph = cover.GetGraph();
+    void Initialize( Cover& cover, double alpha ) {
+        // Computing clustering coefficients
+        const Graph& graph = *cover.m_Graph;
         std::vector< std::tuple<  long, double,  long > > nC( graph.GetNumNodes() ); 
         for(  long i = 0; i < graph.GetNumNodes(); ++i ) { 
             nC.push_back( std::tuple<  long, double,  long >( i,
@@ -336,26 +131,30 @@ namespace triforce {
         }   
         std::sort(nC.begin(), nC.end(), CompareClusterings );                     //Sorts the nC
         std::vector<bool> visited( graph.GetNumNodes(), false );                //Vector to track those visited members.
-        long nextLabel = 0;
+
+        // Creating initial communities
         for( auto it = nC.begin(); it != nC.end(); ++it ) {    
             long nodeId = std::get<0>(*it);
             if(!visited[nodeId]) {
                 visited[nodeId] = true;
-                Cover::Community* community = new Cover::Community( cover, nextLabel );
-                cover.m_Communities.push_back(community);
-                community->Add(nodeId);
+                cover.m_Communities.push_back(new std::set<long>());
+                long communityId = static_cast<long>(cover.m_Communities.size() - 1);
+                cover.m_Communities[communityId]->insert(nodeId);
+                cover.m_NodeMemberships[nodeId].insert(communityId);
                 const  long* adjacencies = graph.GetNeighbors(nodeId);
                 long degree = graph.GetDegree(nodeId);
-                    for( long j = 0; j < degree; ++j ) { 
-                        long neighbor = adjacencies[j];
-                        if(!visited[neighbor]) {
-                            community->Add(neighbor);
-                            visited[neighbor] = true;
-                        }
-                    }   
-                nextLabel++;
+                for( long j = 0; j < degree; ++j ) { 
+                    long neighbor = adjacencies[j];
+                    if(!visited[neighbor]) {
+                        cover.m_Communities[communityId]->insert(neighbor);
+                        cover.m_NodeMemberships[neighbor].insert(communityId);
+                        visited[neighbor] = true;
+                    }
+                }   
             }   
         }   
+        
+       ComputeMembershipStats(cover, alpha);
     }
 
     enum MovementType {
@@ -372,285 +171,333 @@ namespace triforce {
         double m_Improvement;
     };
 
-  bool PerformBestMovement( Cover& cover, const long nodeId, double alpha, double overlapp, double bestScore, Movement& movement ) {
-        bool movementFound = false;
-        double bestRemoveImprovement = -FLT_MAX;
-        long bestRemoveCommunity = -1;
-        bool bestRemoveFound = false;
-        bool bestRemoveOverlapp = false;
-        std::set<long> nodeCommunities = cover.NodeCommunities( nodeId );
-        for(auto it = nodeCommunities.begin(); it != nodeCommunities.end(); ++it) {
-            Cover::Community& community = cover.GetCommunity(*it);
-            bool auxValidOverlapp;
-            double aux = TestRemove( nodeId, community, alpha, overlapp, auxValidOverlapp);
-            if( aux >= bestRemoveImprovement  ) {
-                bestRemoveImprovement = aux; 
-                bestRemoveCommunity = community.Id();
-                bestRemoveOverlapp = auxValidOverlapp;
-                if( bestRemoveImprovement > 0.0 ) bestRemoveFound = true;
+    static bool CompareMovement( const Movement& a, const Movement& b ) {
+        return a.m_Improvement < b.m_Improvement;
+    }
+
+    double TestRemove( const Cover& cover, const long nodeId, const long community, double alpha, double overlapp) {
+        double increment = 0.0;
+        long dinLost = 0;
+        long dinPrimaLost = 0;
+        for (long n : *cover.m_Communities[community]) {
+            long pos = cover.m_Graph->HasNeighbor(nodeId, n);
+            if (pos != -1) {
+                long edgeIndex = cover.m_Graph->GetEdgeIndex(nodeId, pos);
+                if (cover.m_Weights[edgeIndex] == 1) {
+                    increment += cover.m_MembershipStats[n].m_ConnectedRemove;
+                    dinLost++;
+                }
+                dinPrimaLost++;
+            }
+            else {
+                increment += cover.m_MembershipStats[n].m_NotConnectedRemove;
+            }
+        }
+        double denominator = cover.m_Graph->GetDegree(nodeId) + alpha*(cover.m_MembershipStats[nodeId].m_R - cover.m_Communities[community]->size() - (cover.m_MembershipStats[nodeId].m_DinPrima - dinPrimaLost));
+        double newScore = denominator > 0 ? (cover.m_MembershipStats[nodeId].m_Din - dinLost) / denominator : 0.0;
+        increment += newScore - cover.m_MembershipStats[nodeId].m_Score;
+        return increment;
+    }
+
+    double TestInsert( const Cover& cover, const long nodeId, const long community, double alpha, double overlapp) {
+            double increment = 0.0;
+            long dinAdded = 0;
+            long dinPrimaAdded = 0;
+            for( long n : *cover.m_Communities[community] ) {
+                long pos = cover.m_Graph->HasNeighbor(nodeId,n);
+                if( pos != -1 ) {
+                    long edgeIndex = cover.m_Graph->GetEdgeIndex(nodeId, pos);
+                    if( cover.m_Weights[edgeIndex] == 0 ) {
+                        increment+=cover.m_MembershipStats[n].m_ConnectedAdd;
+                        dinAdded++;
+                    }
+                    dinPrimaAdded++;
+                } else {
+                    increment+=cover.m_MembershipStats[n].m_NotConnectedAdd;
+                }
+            }
+            double denominator = cover.m_Graph->GetDegree(nodeId) + alpha*(cover.m_MembershipStats[nodeId].m_R+cover.m_Communities[community]->size() - (cover.m_MembershipStats[nodeId].m_DinPrima + dinPrimaAdded));
+            double newScore = denominator > 0 ?  (cover.m_MembershipStats[nodeId].m_Din + dinAdded) / denominator : 0.0;
+            increment += newScore - cover.m_MembershipStats[nodeId].m_Score;
+        return increment;
+    }
+
+
+    static void PerformMovements( Cover& cover, const long nodeId, double alpha, double overlap, double bestScore, std::vector<Movement>& retRemoves, std::vector<Movement>& retInserts, std::vector<Movement>& retTransfers ) {
+        std::vector<Movement> removes;
+        const long* adjacencies = cover.m_Graph->GetNeighbors(nodeId);
+        for( long c : cover.m_NodeMemberships[nodeId] ) {
+            double improvement = TestRemove(cover, nodeId, c, alpha, overlap);
+            if( removes.size() == 0 ) {
+                Movement movement;
+                movement.m_Type = E_REMOVE;
+                movement.m_NodeId = nodeId;
+                movement.m_CommunityId1 = c;
+                movement.m_Improvement = improvement;
+                removes.push_back(movement);
+            } else if( removes[0].m_Improvement < improvement ) {
+                removes[0].m_NodeId = nodeId;
+                removes[0].m_CommunityId1 = c;
+                removes[0].m_Improvement = improvement;
             }
         }
 
-        const long* adjacencies = cover.m_Graph.GetNeighbors(nodeId); 
-        long degree = cover.m_Graph.GetDegree(nodeId);
-        std::set<long> possibleCommunities;
+        std::vector<Movement> inserts;
+        std::set<long> candidates;
+        long degree = cover.m_Graph->GetDegree(nodeId);
         for( long i = 0; i < degree; ++i ) {
             long neighbor = adjacencies[i];
-            const std::set<long>& neighborCommunities = cover.NodeCommunities( neighbor );
-            for( auto it = neighborCommunities.begin(); it != neighborCommunities.end(); ++it ) {
-                const Cover::Community& community = cover.GetCommunity(*it);
-                if( nodeCommunities.find(*it) == nodeCommunities.end())  {
-                    possibleCommunities.insert(*it);
+            for( long c : cover.m_NodeMemberships[neighbor] ) {
+                candidates.insert(c);
+            }
+        }
+
+        for( long c : candidates ) {
+            double improvement = TestInsert(cover, nodeId, c, alpha, overlap);
+            if( improvement > 0.0 ) {
+                if( inserts.size() == 0 ) {
+                    Movement movement;
+                    movement.m_Type = E_INSERT;
+                    movement.m_NodeId = nodeId;
+                    movement.m_CommunityId1 = c;
+                    movement.m_Improvement = improvement;
+                    inserts.push_back(movement);
+                } else if( inserts[0].m_Improvement < improvement ) {
+                    inserts[0].m_NodeId = nodeId;
+                    inserts[0].m_CommunityId1 = c;
+                    inserts[0].m_Improvement = improvement;
                 }
             }
         }
 
-        double bestInsertImprovement = -FLT_MAX;
-        long bestInsertCommunity = -1;
-        bool bestInsertFound = false;
-        bool bestInsertOverlapp = false;
-        for( auto it = possibleCommunities.begin(); it != possibleCommunities.end(); ++it ) {
-            Cover::Community& community = cover.GetCommunity(*it);
-            bool auxOverlapp;
-            double aux = TestInsert( nodeId, community, alpha, overlapp, auxOverlapp );
-            if( aux >= bestInsertImprovement ) {
-                bestInsertImprovement = aux; 
-                bestInsertCommunity = community.Id();
-                bestInsertOverlapp = auxOverlapp;
-                if( bestInsertImprovement > 0.0 ) bestInsertFound = true;
+        std::sort(removes.begin(), removes.end(), CompareMovement);
+        std::sort(inserts.begin(), inserts.end(), CompareMovement);
+        long rindex = 0, iindex = 0;
+        long slots = MaxOverlap(degree,overlap) - static_cast<long>(cover.m_NodeMemberships[nodeId].size());
+        while( ( (rindex < removes.size()) && (removes[rindex].m_Improvement != 0.0)) || (iindex < inserts.size() && (inserts[iindex].m_Improvement != 0.0))) {
+            bool movementFound = false;
+            if( rindex < removes.size() && removes[rindex].m_Improvement > 0.0 ) {
+                retRemoves.push_back(removes[rindex]);
+                movementFound = true;
+                rindex++;
+                slots++;
+            }
+            if( iindex < inserts.size() ) {
+                if( slots > 0 && inserts[iindex].m_Improvement > 0.0 ) {
+                    retInserts.push_back(inserts[iindex]);
+                    movementFound = true;
+                    iindex++;
+                    slots--;
+                } else if ( (rindex < removes.size()) && (inserts[iindex].m_Improvement > 0.0) && (removes[rindex].m_Improvement <= 0.0) &&
+                            (inserts[iindex].m_Improvement + removes[rindex].m_Improvement) > 0.0 ) {
+                    Movement movement;
+                    movement.m_Type = E_TRANSFER;
+                    movement.m_NodeId = nodeId;
+                    movement.m_CommunityId1 = removes[rindex].m_CommunityId1;
+                    movement.m_CommunityId2 = inserts[iindex].m_CommunityId1;
+                    movement.m_Improvement = inserts[iindex].m_Improvement + removes[rindex].m_Improvement;
+                    retTransfers.push_back(movement);
+                    movementFound = true;
+                    iindex++;
+                    rindex++;
+                }
+            }
+            if(!movementFound) return;
+        } 
+    }
+
+
+    double TestMerge( const Cover& cover, const long communityId1, const long communityId2, double alpha, double overlap ) {
+
+        const Graph& graph = *cover.m_Graph;
+        const std::set<long>& community1 = *cover.m_Communities[communityId1];
+        const std::set<long>& community2 = *cover.m_Communities[communityId2];
+        double improvement = 0.0;
+        for( long nodeId1 : community1 ) {
+            double din = 0;
+            double dinPrima = 0;
+            for( long nodeId2 : community2 ) {
+                long pos = graph.HasNeighbor( nodeId1, nodeId2 );
+                if( pos != -1 ) {
+                    long index = graph.GetEdgeIndex( nodeId1, pos );
+                    if( cover.m_Weights[index] == 0 ) {
+                        din++;
+                    }
+                    dinPrima++;
+                }
+            }
+            double denominator = cover.m_Graph->GetDegree(nodeId1) + alpha*(cover.m_MembershipStats[nodeId1].m_R + cover.m_Communities[communityId2]->size() - (cover.m_MembershipStats[nodeId1].m_DinPrima + dinPrima));
+            double newScore = denominator > 0 ? (cover.m_MembershipStats[nodeId1].m_Din + din) / denominator : 0.0;
+            improvement += newScore - cover.m_MembershipStats[nodeId1].m_Score;
+        }
+
+        for( long nodeId1 : community2 ) {
+            double din = 0;
+            double dinPrima = 0;
+            for( long nodeId2 : community1 ) {
+                long pos = graph.HasNeighbor( nodeId1, nodeId2 );
+                if( pos != -1 ) {
+                    long index = graph.GetEdgeIndex( nodeId1, pos );
+                    if( cover.m_Weights[index] == 0 ) {
+                        din++;
+                    }
+                    dinPrima++;
+                }
+            }
+            double denominator = cover.m_Graph->GetDegree(nodeId1) + alpha*(cover.m_MembershipStats[nodeId1].m_R + cover.m_Communities[communityId1]->size() - (cover.m_MembershipStats[nodeId1].m_DinPrima + dinPrima));
+            double newScore = denominator > 0 ? (cover.m_MembershipStats[nodeId1].m_Din + din) / denominator : 0.0;
+            improvement += newScore - cover.m_MembershipStats[nodeId1].m_Score;
+        }
+        return improvement;
+    }
+
+    struct CommunityMerge {
+        long m_CommunityId1;
+        long m_CommunityId2;
+        long m_Improvement;
+    };
+
+    static bool CompareCommunityMerge( const CommunityMerge& a, const CommunityMerge& b ) {
+        return a.m_Improvement < b.m_Improvement;
+    }
+
+    static void MergeCommunities( Cover& cover, double alpha, double overlapp ) {
+        const Graph& graph = *cover.m_Graph;
+        std::set<std::tuple<long,long> > mergeTries;
+        long numNodes = graph.GetNumNodes();
+        for( long i = 0; i < numNodes; ++i ) {
+            const std::set<long>& communities = cover.m_NodeMemberships[i];
+            const long* adjacencies = graph.GetNeighbors(i);
+            long degree = graph.GetDegree(i);
+            for( long j = 0; j < degree; ++j ) {
+                long neighbor = adjacencies[j];
+                if( i < neighbor ) {
+                    const std::set<long>& nCommunities = cover.m_NodeMemberships[neighbor];
+                    for( auto it = communities.begin(); it != communities.end(); ++it ) {
+                        for( auto it2 = nCommunities.begin(); it2 != nCommunities.end(); ++it2 ) {
+                            if(*it != *it2 ) {
+                                mergeTries.insert(std::tuple<long,long>(*it, *it2));
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        double bestImprovement = 0.0;
-        if( bestRemoveFound && bestRemoveOverlapp ) {
-            bestImprovement = bestRemoveImprovement;
-            movement.m_Type = E_REMOVE;
-            movement.m_NodeId = nodeId;
-            movement.m_CommunityId1 = bestRemoveCommunity;
-            movement.m_Improvement = bestImprovement;
-            movementFound = true;
+        std::vector<CommunityMerge> merges;
+        for( std::tuple<long,long> t : mergeTries ) {
+            long c1 = std::get<0>(t);
+            long c2 = std::get<1>(t);
+            if( cover.m_Communities[c1]->size() != 0 && cover.m_Communities[c2]->size() != 0 ) {
+                double improvement = TestMerge( cover, c1, c2, alpha, overlapp );
+                if( improvement > 0.0 ) {
+                    CommunityMerge merge;
+                    merge.m_CommunityId1 = c1;
+                    merge.m_CommunityId2 = c2;
+                    merge.m_Improvement = improvement;
+                    merges.push_back(merge);
+                }
+            }
         }
-        if( bestInsertFound && bestInsertOverlapp && (bestInsertImprovement > bestRemoveImprovement) ) {
-            bestImprovement = bestInsertImprovement;
-            movement.m_Type = E_INSERT;
-            movement.m_NodeId = nodeId;
-            movement.m_CommunityId1 = bestInsertCommunity;
-            movement.m_Improvement = bestImprovement;
-            movementFound = true;
+        std::sort(merges.begin(), merges.end(), CompareCommunityMerge );
+        std::set<long> touched;
+        for( CommunityMerge m : merges ) {
+            if( touched.find(m.m_CommunityId1) == touched.end() &&
+                    touched.find(m.m_CommunityId2) == touched.end() ) {
+                std::set<long>& community1 = *cover.m_Communities[m.m_CommunityId1];
+                std::set<long>& community2 = *cover.m_Communities[m.m_CommunityId2];
+                for( long n : community2 ) {
+                    cover.m_NodeMemberships[n].erase(m.m_CommunityId2);
+                    cover.m_NodeMemberships[n].insert(m.m_CommunityId1);
+                }
+                community1.insert(community2.begin(), community2.end());
+                community2.clear();
+                touched.insert(m.m_CommunityId1);
+                touched.insert(m.m_CommunityId2);
+            }
         }
-        double bestRemoveAndInsert = (bestInsertImprovement + bestRemoveImprovement);
-        if( (bestRemoveAndInsert > 0.0) &&  (bestRemoveAndInsert > bestImprovement) && ValidOverlapp(cover, nodeId, overlapp)) {
-            bestImprovement = bestRemoveAndInsert;
-            movement.m_Type = E_TRANSFER;
-            movement.m_NodeId = nodeId;
-            movement.m_CommunityId1 = bestRemoveCommunity;
-            movement.m_CommunityId2 = bestInsertCommunity;
-            movement.m_Improvement = bestImprovement;
-            movementFound = true;
-        } 
-        //std::cout << cover.m_Graph.ReMap(nodeId) << " "<< bestRemoveAndInsert << " " << bestInsertImprovement << " " << bestRemoveImprovement << " " << bestImprovement << " " << movement.m_Type << " " << movementFound << std::endl;
-
-//        nodeCommunities = NodeCommunities( nodeId );
-//        for(auto it = nodeCommunities.begin(); it != nodeCommunities.end(); ++it) {
-//            Cover::Community& community1 = this->GetCommunity(*it);
-//            for( auto it2 = possibleCommunities.begin(); it2 != possibleCommunities.end(); ++it2 ) {
-//                Cover::Community& community2 = this->GetCommunity(*it2);
-//                if( (*it != *it2) && community1.Contains(nodeId) && !community2.Contains(nodeId) ) {
-//                /*    community1.Remove(nodeId);
-//                    community2.Add(nodeId);
-//                    double newScore = Score( *this, alpha, overlapp );
-//                    community1.Add(nodeId);
-//                    community2.Remove(nodeId);
-//                    double scoreDiff = newScore - bestScore ;
-//                    if( scoreDiff > bestImprovement) {
-//                        bestImprovement = newScore - bestScore; 
-//                        movement.m_Type = E_TRANSFER;
-//                        movement.m_NodeId = nodeId;
-//                        movement.m_CommunityId1 = community1.Id();
-//                        movement.m_CommunityId2 = community2.Id();
-//                        movementFound = true;
-//                    }
-//                    */
-//                    double aux = TestInsert( nodeId, community2, alpha, overlapp ) + TestRemove( nodeId, community1, alpha, overlapp );
-//                    if( aux > bestImprovement ) {
-//                        bestImprovement = aux; 
-//                        movement.m_Type = E_TRANSFER;
-//                        movement.m_NodeId = nodeId;
-//                        movement.m_CommunityId1 = community1.Id();
-//                        movement.m_CommunityId2 = community2.Id();
-//                        movementFound = true;
-//                    }
-//                }
-//            }
-//        }
-        return movementFound;
     }
 
-  static void Merge( Cover& cover, long id1, long id2, double alpha, double overlapp ) {
-      Cover::Community& community1 = cover.GetCommunity( id1 );
-      Cover::Community& community2 = cover.GetCommunity( id2 );
-      
-      std::set<long> temp1 = community1.Nodes();;
-      std::set<long> temp2 = community2.Nodes();;
-      std::set<long> unionSet = community1.Nodes();
-      std::set<long> intersectionSet;
+    void RefineCommunities( Cover& cover, double alpha, double overlap ) {
+        long bestCoverSize = 0;
+        Cover* bestCover = Create(cover.m_Graph);
+        Copy(*bestCover, cover);
+        double bestScore = Score(*bestCover, alpha, overlap );
+        double currentScore = bestScore;
+        std::cout << "Initial Score: " << bestScore << std::endl;
+        int lookahead = LOOKAHEAD;
+        while(lookahead > 0) {
+            lookahead--;
+            std::cout << "Starting Iteration" << std::endl;
+            std::vector<Movement> removes;
+            std::vector<Movement> inserts;
+            std::vector<Movement> transfers;
+            for( long i = 0; i < cover.m_Graph->GetNumNodes(); ++i ) {
+                PerformMovements(cover,i, alpha, overlap, currentScore, removes, inserts, transfers);
+            }
+            for( Movement& movement : removes ) {
+                cover.m_Communities[movement.m_CommunityId1]->erase(movement.m_NodeId);
+                cover.m_NodeMemberships[movement.m_NodeId].erase(movement.m_CommunityId1);
+            }
 
-      for( long n : temp1 ) {
-          unionSet.insert(n);
-      }
+            for( Movement& movement : inserts ) {
+                cover.m_Communities[movement.m_CommunityId1]->insert(movement.m_NodeId);
+                cover.m_NodeMemberships[movement.m_NodeId].insert(movement.m_CommunityId1);
+            }
 
-      for( long n : temp2 ) {
-          unionSet.insert(n);
-      }
-      
-      double before = 0.0;
-      for( long n : unionSet ) {
-          if( (temp1.find(n) != temp1.end()) && (temp2.find(n) != temp2.end()) ) {
-              intersectionSet.insert(n);
-          }
-          bool valid;
-          before += Score(cover, n, alpha, overlapp, valid);
-          if(!valid) {
-              before=0.0;
-              break;
-          }
-      }
+            for( Movement& movement : transfers ) {
+                cover.m_Communities[movement.m_CommunityId1]->erase(movement.m_NodeId);
+                cover.m_NodeMemberships[movement.m_NodeId].erase(movement.m_CommunityId1);
+                cover.m_Communities[movement.m_CommunityId2]->insert(movement.m_NodeId);
+                cover.m_NodeMemberships[movement.m_NodeId].insert(movement.m_CommunityId2);
+            }
 
-      for( long n : temp2 ) {
-          community2.Remove(n);
-          community1.Add(n);
-      }
+            std::list<long> slots;
+            for( int i = 0; i < cover.m_Communities.size(); ++i ) {
+                if( cover.m_Communities[i]->size() == 0 ) {
+                    slots.push_back(i);
+                }
+            }
 
-      double after = 0.0;
-      for( long n : unionSet ) {
-          bool valid;
-          after += Score(cover, n, alpha, overlapp, valid);
-          if(!valid) {
-              after=0.0;
-              break;
-          }
-      }
+            for( int i = 0; i < cover.m_Graph->GetNumNodes(); ++i ) {
+                if( cover.m_NodeMemberships[i].size() == 0 ) {
+                    if( slots.size() > 1 ) {
+                        long community = slots.front();
+                        slots.pop_front();
+                        cover.m_Communities[community]->insert(i);
+                        cover.m_NodeMemberships[i].insert(community);
+                    } else {
+                        cover.m_Communities.push_back(new std::set<long>());
+                        long community = static_cast<long>(cover.m_Communities.size() - 1);
+                        cover.m_Communities[community]->insert(i);
+                        cover.m_NodeMemberships[i].insert(community);
+                    }
+                }
+            }
 
-      if( after < before ) {
-          for( long n : temp2 ) {
-              community1.Remove(n);
-              community2.Add(n);
-          }
-          for( long n : intersectionSet ) {
-              community1.Add(n);
-          }
-      }
-
-
-  }
-
-  static void MergeCommunities( Cover& cover, double alpha, double overlapp ) {
-      const Graph& graph = cover.GetGraph();
-      std::set<std::tuple<long,long> > mergeTries;
-      long numNodes = graph.GetNumNodes();
-      for( long i = 0; i < numNodes; ++i ) {
-          const std::set<long> communities = cover.NodeCommunities( i ); 
-          const long* adjacencies = graph.GetNeighbors(i);
-          long degree = graph.GetDegree(i);
-          for( long j = 0; j < degree; ++j ) {
-              long neighbor = adjacencies[j];
-              if( i < neighbor ) {
-                  const std::set<long> nCommunities = cover.NodeCommunities( neighbor );
-                  for( auto it = communities.begin(); it != communities.end(); ++it ) {
-                      for( auto it2 = nCommunities.begin(); it2 != nCommunities.end(); ++it2 ) {
-                          if(*it != *it2 ) {
-                              mergeTries.insert(std::tuple<long,long>(*it, *it2));
-                          }
-                      }
-                  }
-              }
-          }
-      }
-      for( std::tuple<long,long> t : mergeTries ) {
-          const Cover::Community& communityA = cover.GetCommunity(std::get<0>(t));
-          const Cover::Community& communityB = cover.GetCommunity(std::get<1>(t));
-          if( communityA.Size() != 0 && communityB.Size() != 0 ) {
-             Merge( cover, communityA.Id(), communityB.Id(), alpha, overlapp );
-          }
-      }
-  }
-
-  void RefineCommunities( Cover& cover, double alpha, double overlapp ) {
-      long bestCoverSize = 0;
-      long* bestCover = cover.Serialize( bestCoverSize );
-      double bestScore = Score(cover, alpha, overlapp );
-      double currentScore = bestScore;
-      std::cout << "Initial Score: " << bestScore << std::endl;
-      int lookahead = LOOKAHEAD;
-      while(lookahead > 0) {
-          lookahead--;
-          std::cout << "Starting Iteration" << std::endl;
-          //Compute new cover.
-          std::vector<Movement> movements;
-          for( long i = 0; i < cover.m_Graph.GetNumNodes(); ++i ) {
-              Movement movement;
-              if(PerformBestMovement(cover,i, alpha, overlapp, currentScore, movement)) {
-                  movements.push_back(movement);
-              }
-          }
-          std::cout << "Number of movements performed " << movements.size() << std::endl;
-          Cover::Community* community1; 
-          Cover::Community* community2;
-          for( long i = 0; i < movements.size(); ++i ) {
-              Movement& movement = movements[i];
-              switch(movement.m_Type) {
-                  case E_REMOVE:
-                      community1 = &(cover.GetCommunity(movement.m_CommunityId1));
-                      community1->Remove(movement.m_NodeId);
-                      if(cover.NumCommunities(movement.m_NodeId) == 0) {
-                          Cover::Community* community = new Cover::Community(cover,cover.NumCommunities()); 
-                          cover.m_Communities.push_back(community);
-                          community->Add(movement.m_NodeId);
-                      }
-                      std::cout << "Remove" << std::endl;
-                      break;
-                  case E_INSERT:
-                      community1 = &(cover.GetCommunity(movement.m_CommunityId1));
-                      community1->Add(movement.m_NodeId);
-                      std::cout << "Insert" << std::endl;
-                      break;
-                  case E_TRANSFER:
-                      community1 = &(cover.GetCommunity(movement.m_CommunityId1));
-                      community2 = &(cover.GetCommunity(movement.m_CommunityId2));
-                      community1->Remove(movement.m_NodeId);
-                      community2->Add(movement.m_NodeId);
-                      std::cout << "Transfer" << std::endl;
-                      break;
-              };
-          }
-          currentScore = Score(cover, alpha, overlapp );
-          std::cout << "New Score " << currentScore << std::endl;
-          double diff = currentScore - bestScore;
-          if( diff > 0.001) {
-              std::cout << "Cover Improved" << std::endl;
-              delete [] bestCover;
-              bestCover = cover.Serialize( bestCoverSize );
-              bestScore = currentScore;
-              lookahead = LOOKAHEAD;
-          } /*else {
-              // Merge communities
-              //cover.Deserialize(bestCover, bestCoverSize);
-              std::cout << "Merging communities "<< std::endl;
-              MergeCommunities( cover, alpha, overlapp);
-              currentScore = Score(cover, alpha, overlapp );
-              std::cout << "New Score after merging communities " << currentScore << std::endl;
-              double diff = currentScore - bestScore;
-              if( diff > 0.0 ) {
-                  std::cout << "Cover Improved" << std::endl;
-                  delete [] bestCover;
-                  bestCover = cover.Serialize( bestCoverSize );
-                  bestScore = currentScore;
-                  lookahead = LOOKAHEAD;
-              }               
-          }
-          */
-      }        
-      cover.Deserialize(bestCover, bestCoverSize);
-      delete [] bestCover;
-  }
+            std::cout << "Number of movements performed: " << inserts.size()+removes.size()+transfers.size() << std::endl;
+            ComputeMembershipStats(cover,alpha);
+            currentScore = Score(cover, alpha, overlap );
+            std::cout << "New Score " << currentScore << std::endl;
+            double diff = currentScore - bestScore;
+            if( diff <= 0.001) {
+                std::cout << "Movements did not improve, trying merges " << std::endl;
+                MergeCommunities(cover, alpha, overlap);
+                ComputeMembershipStats(cover,alpha);
+                currentScore = Score(cover, alpha, overlap );
+                std::cout << "New Score after merging " << currentScore << std::endl;
+                diff = currentScore - bestScore;
+            } 
+            
+            if( diff > 0.001) {
+                std::cout << "Cover Improved" << std::endl;
+                Destroy(bestCover);
+                bestCover = Create(cover.m_Graph);
+                Copy(*bestCover,cover);
+                bestScore = currentScore;
+                lookahead = LOOKAHEAD;
+            }
+        }        
+        Copy(cover,*bestCover);
+    }
 }

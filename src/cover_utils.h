@@ -21,6 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace triforce {
 
+    void Initialize( Cover& cover, double alpha );
+
     /** @brief Computes the score of a cover.
      *  @param cover the cover to compute the score from.
      *  @return The score of the cover.*/
@@ -29,78 +31,39 @@ namespace triforce {
     /** @brief Computes the score of a node in a cover.
      *  @param cover The cover to compute the score from.
      *  @param nodeId The id of the node to compute the score.
+     *  @param alpha The alpha coefficient.
+     *  @param overlap The allowed overlap.
      *  @return The score of the node in the cover.*/
-    double Score( const Cover& cover,  long nodeId, double alpha, double overlapp, bool& validOverlapp );
+    double Score( const Cover& cover,  long nodeId, double alpha, double overlap);
 
-    /** @brief Computes if two communities are significantly similar.
-     *  @param communityA The first community.  
-     *  @param communityB The second community.
-     *  @return true if both communities are significantly similar. false otherwise.*/
-    bool Similar( const Cover& cover, const Cover::Community& communityA, const Cover::Community& communityB, double overlapp );
 
-    /** @brief Computes a the union of all the communities a node belongs.
-     *  @param cover The cover.
-     *  @param nodeId The node to compute the union from.
-     *  @return The set of nodes in the union.*/
-    std::set< long> CommunityUnion( const Cover& cover, 
-                                            const  long nodeId );
     /** @brief Prints a cover to a stream.
      *  @param cover The cover to print.
      *  @param stream The stream to print the over.*/
     void Print( const Cover& cover, std::ostream& stream );
 
-    /** @brief Countes the number of nodes .
-     *  @param cover The cover to print.
-     *  @param stream The stream to print the over.
-     *  @param alpha The alpha parameter controllign the cohesion of the communities*/
-    void PrintZero( const Cover& cover, std::ostream& stream, double alpha, double overlapp );
+    /** @brief Tests if a node should be removed from a community.
+     *  @param cover The cover.
+     *  @param nodeId The id of the node.
+     *  @param community The community to test.
+     *  @param alpha The alpha coefficient.
+     *  @param overlap The allowed overlap.
+     *  @return The improvement*/
+    double TestRemove( const Cover& cover, const long nodeId, const long community, double alpha, double overlapp);
 
     /** @brief Tests if a node should be removed from a community.
-     *  @param nodeID The id of the node.
+     *  @param cover The cover.
+     *  @param nodeId The id of the node.
      *  @param community The community to test.
+     *  @param alpha The alpha coefficient.
+     *  @param overlap The allowed overlap.
      *  @return The improvement*/
-    double TestRemove( const long nodeId, const Cover::Community& comunity, double alpha, double overlapp, bool& validOverlapp );
-
-    /** @brief Tests if a node should be inserted into a community.
-     *  @param nodeID The id of the node.
-     *  @param community The community to test.
-     *  @return The improvement.*/
-    double TestInsert( const long nodeId, const Cover::Community& comunity, double alpha, double overlapp, bool& validOverlapp );
-
-    /** @brief Tests if a node has a valid overlapp.
-     *  @param nodeId The id of the node.
-     *  @return true if the has a valid overlap.*/
-    bool ValidOverlapp( const Cover& cover,  long nodeId, double overlapp );
-
-    /** @brief Tests if a node can overlap to a new community.
-     *  @param nodeID The id of the node.
-     *  @return true if the node can overlap.*/
-    bool CanOverlapMore( const Cover& cover, const long nodeId, double overlapp );
-
-    /** @brief Tests if inserting a node into a community violates the overlapp.
-     *  @param nodeId The id of the node.
-     *  @param community The community to test.
-     *  @return true if inserting the node violates overlapp*/
-    bool ViolatesOverlappInsert( const long nodeId, const Cover::Community& community);
-
-    /** @brief Tests if removing a node into a community violates the overlapp.
-     *  @param nodeId The id of the node.
-     *  @param community The community to test.
-     *  @return true if removing the node violates overlapp*/
-    bool ViolatesOverlappRemove( const long nodeId, const Cover::Community& community);
-
-    /** @brief Initializes a cover with an initial partition
-     *  @param alpha The alpha parameter to use.
-     *  @param overlapp The maximum alowed overlapp.*/
-    void Initialize( Cover& cover, double alpha, double overlapp );
+    double TestInsert( const Cover& cover, const long nodeId, const long comunity, double alpha, double overlapp);
 
     /** @brief Refines the communities in the cover.
      *  @param alpha The alpha value controling the cohesivness of the communities
      *  @param overlapp The level of overlapp allowed.*/
     void RefineCommunities( Cover& cover, double alpha , double overlapp );
-
-    bool PerformBestMovement( Cover& cover, const long nodeId, double alpha, double overlapp, double bestScore, Movement& movement );
-
 }
 
 #endif

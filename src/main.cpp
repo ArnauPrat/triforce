@@ -72,7 +72,7 @@ int main( int argc, char** argv ) {
     double alpha = 1.0;
     double overlapp = 0.5;
 
-    for (uint32_t i = 1; i < argc; i++) {
+    for (int i = 1; i < argc; i++) {
         CHECK_ARGUMENT_STRING(i, "-f", graphFileName, graphFileNameSet)
         CHECK_ARGUMENT_STRING(i, "-o", outputFileName, outputFileNameSet)
         CHECK_ARGUMENT_FLOAT(i, "-a", alpha, alphaSet)
@@ -86,15 +86,14 @@ int main( int argc, char** argv ) {
 
     triforce::Graph graph;
     graph.Load(graphFileName, 1);
-    triforce::Cover cover(graph);
-    triforce::Initialize(cover,alpha,overlapp);
-    triforce::RefineCommunities(cover, alpha, overlapp);
+    triforce::Cover* cover =  Create(&graph);
+    triforce::Initialize(*cover,alpha);
+    triforce::RefineCommunities(*cover, alpha, overlapp);
     std::ofstream outputFile;
     outputFile.open(outputFileName);
-    Print(cover, outputFile);
-//    PrintZero(cover, std::cout, alpha, overlapp);
+    Print(*cover, outputFile);
     outputFile.close();
-    std::cout << "Score: " << triforce::Score( cover, alpha, overlapp ) << std::endl;
-//    std::cout << "Number of communities: " << cover.NumCommunities() << std::endl;
+    std::cout << "Score: " << triforce::Score( *cover, alpha, overlapp ) << std::endl;
+    Destroy(cover);
     return 0;
 }
