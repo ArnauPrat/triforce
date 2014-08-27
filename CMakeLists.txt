@@ -15,7 +15,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8.2)
 PROJECT(triforce CXX)
 IF( UNIX )
 	SET(CMAKE_CXX_FLAGS_DEBUG "-O0 -std=c++11 -g -pg -fopenmp -DPROFILE -Wall")	
-	SET(CMAKE_CXX_FLAGS_RELEASE "-O3 -std=c++11 -fopenmp -DNDEBUG -Wall ")	
+	SET(CMAKE_CXX_FLAGS_RELEASE "-O3 -std=c++11 -g -pg -fopenmp -DNDEBUG -Wall ")	
 ENDIF(UNIX)
 
 IF( WIN32 )

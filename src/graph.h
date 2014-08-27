@@ -28,10 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 namespace triforce {
 
     static int CompareLong (const void * a, const void * b) {
-        if ( *(long*)a > *(long*)b ) return 1;
+    /*    if ( *(long*)a > *(long*)b ) return 1;
         if ( *(long*)a < *(long*)b ) return -1;
         if ( *(long*)a == *(long*)b ) return 0;
-		return 0;
+        */
+        return *(long*)a - *(long*)b;
     }
 
 		/**	@brief This class represents a graph.*/
