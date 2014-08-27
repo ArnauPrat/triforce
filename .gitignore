@@ -21,3 +21,8 @@ build/CMakeFiles/TargetDirectories.txt
 *.sdf
 *.sln
 build/communities.dat
+build/network.dat
+build/profiling/communities.dat
+*.psess
+*.user
+*.vsp
