@@ -130,7 +130,7 @@ namespace triforce {
             return 1;
         }
 
-        for (long i = 0; i < m_NumNodes; i++) {
+        for (long i = 0; i <= m_NumNodes; i++) {
             m_Nodes[i] = 0;
         }
 
