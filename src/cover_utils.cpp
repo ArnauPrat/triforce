@@ -376,18 +376,30 @@ namespace triforce {
    struct CommunityRelation {
        long m_CommunityId1;
        long m_CommunityId2;
-       long m_Edges;
-
-/*       bool operator() (const CommunityRelation& a, const CommunityRelation& b) const
+       bool operator() (const CommunityRelation& a, const CommunityRelation& b) const
        {
-           if( m_COmmunity 
+           if ( a.m_CommunityId1 < b.m_CommunityId1) return true;
+           if (b.m_CommunityId1 < a.m_CommunityId1) return false;
+           return a.m_CommunityId2 < b.m_CommunityId2;
        }
-       */
    };
+
+   bool TryMerge(const Cover& cover, long c1, long c2, long d, double alpha) {
+       double r1 = cover.m_Communities[c1]->size();
+       double r2 = cover.m_Communities[c2]->size();
+       double din1 = cover.m_CommunityStats[c1].m_InDegree/2.0;
+       double din2 = cover.m_CommunityStats[c2].m_InDegree/2.0;
+       double dout1 = cover.m_CommunityStats[c1].m_OutDegree; 
+       double dout2 = cover.m_CommunityStats[c2].m_OutDegree; 
+       double before = r1*(din1 / r1) / ( (din1+dout1+d)/r1 + alpha*(r1-1-(din1/r1))) + r2*(din2 / r2) / ( (din2+dout2+d)/r2 + alpha*(r2-1-(din2/r2)));
+       double after =   r1*((din1 + d) / r1) / ( (din1+dout1+d)/r1 + alpha*(r1+r2-1-((din1+d)/r1))) + 
+                        r2*((din2 + d) / r2) / ( (din2+dout2+d)/r2 + alpha*(r1+r2-1-((din2+d)/r2)));
+       return after > before;
+   }
 
     static void MergeCommunities( Cover& cover, double alpha, double overlapp ) {
         const Graph& graph = *cover.m_Graph;
-        std::set<std::tuple<long,long> > mergeTries;
+        std::map<CommunityRelation, long, CommunityRelation > mergeTries;
         long numNodes = graph.GetNumNodes();
         for( long i = 0; i < numNodes; ++i ) {
             const std::set<long>& communities = cover.m_NodeMemberships[i];
@@ -400,7 +412,12 @@ namespace triforce {
                     for( auto it = communities.begin(); it != communities.end(); ++it ) {
                         for( auto it2 = nCommunities.begin(); it2 != nCommunities.end(); ++it2 ) {
                             if(*it != *it2 ) {
-                                mergeTries.insert(std::tuple<long,long>(*it, *it2));
+                                CommunityRelation rel;
+                                rel.m_CommunityId1 = std::min(*it, *it2);
+                                rel.m_CommunityId2 = std::max(*it, *it2);
+                                auto p = mergeTries.insert(std::pair<CommunityRelation,long>(rel,0));
+                                auto ref = p.first;
+                                (*ref).second++;
                             }
                         }
                     }
@@ -408,21 +425,30 @@ namespace triforce {
             }
         }
 
+        long filtered = 0;
+        long total = 0;
         std::vector<CommunityMerge> merges;
-        for( std::tuple<long,long> t : mergeTries ) {
-            long c1 = std::get<0>(t);
-            long c2 = std::get<1>(t);
+        for( auto rel : mergeTries ) {
+            long c1 = rel.first.m_CommunityId1;
+            long c2 = rel.first.m_CommunityId2;
             if( cover.m_Communities[c1]->size() != 0 && cover.m_Communities[c2]->size() != 0 ) {
-                double improvement = TestMerge( cover, c1, c2, alpha, overlapp );
-                if( improvement > 0.0 ) {
-                    CommunityMerge merge;
-                    merge.m_CommunityId1 = c1;
-                    merge.m_CommunityId2 = c2;
-                    merge.m_Improvement = improvement;
-                    merges.push_back(merge);
+                total++;
+                if (TryMerge(cover, c1, c2, rel.second, alpha)) {
+                    double improvement = TestMerge(cover, c1, c2, alpha, overlapp);
+                    if (improvement > 0.0) {
+                        CommunityMerge merge;
+                        merge.m_CommunityId1 = c1;
+                        merge.m_CommunityId2 = c2;
+                        merge.m_Improvement = improvement;
+                        merges.push_back(merge);
+                    }
+                }
+                else {
+                    filtered++;
                 }
             }
         }
+        std::cout << "Number of merges filtered by heuristic: " << filtered << " out of " << total << std::endl;
         std::sort(merges.begin(), merges.end(), CompareCommunityMerge );
         std::set<long> touched;
         for( CommunityMerge m : merges ) {
