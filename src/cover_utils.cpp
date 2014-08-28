@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iterator>
+#include <cstring>
 #include <cmath>
 #include <list>
 #include <set>
