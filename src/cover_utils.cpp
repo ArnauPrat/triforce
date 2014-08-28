@@ -428,6 +428,7 @@ namespace triforce {
 
         long filtered = 0;
         long total = 0;
+        long improved = 0;
         std::vector<CommunityMerge> merges;
         for( auto rel : mergeTries ) {
             long c1 = rel.first.m_CommunityId1;
@@ -442,6 +443,7 @@ namespace triforce {
                         merge.m_CommunityId2 = c2;
                         merge.m_Improvement = improvement;
                         merges.push_back(merge);
+                        improved++;
                     }
                 }
                 else {
@@ -450,6 +452,8 @@ namespace triforce {
             }
         }
         std::cout << "Number of merges filtered by heuristic: " << filtered << " out of " << total << std::endl;
+        std::cout << "Heuristic precision: " << improved / static_cast<double>(total - filtered) << std::endl;
+        std::cout << "Number of possible merges: " << merges.size() << std::endl;
         std::sort(merges.begin(), merges.end(), CompareCommunityMerge );
         std::set<long> touched;
         for( CommunityMerge m : merges ) {
