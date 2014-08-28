@@ -62,6 +62,9 @@ namespace triforce {
     }
 
     static void ComputeMembershipStats( Cover& cover, double alpha ) {
+        if (cover.m_CommunityStats) delete[] cover.m_CommunityStats;
+        cover.m_CommunityStats = new CommunityStats[cover.m_Communities.size()];
+        std::memset(cover.m_CommunityStats, 0, sizeof(CommunityStats)*cover.m_Communities.size());
         const Graph& graph = *cover.m_Graph;
         for( long i = 0; i < graph.GetNumNodes(); ++i ) {
             long r = 0;
@@ -72,16 +75,26 @@ namespace triforce {
             long dinPrima = 0;
             const long* adjacencies = graph.GetNeighbors(i);
             long degree = graph.GetDegree(i);
-            for( long j = 0; j < degree; ++j ) {
+            for (long j = 0; j < degree; ++j) {
                 long neighbor = adjacencies[j];
                 std::set<long> intersection;
                 std::set_intersection(cover.m_NodeMemberships[i].begin(),
-                        cover.m_NodeMemberships[i].end(),
-                        cover.m_NodeMemberships[neighbor].begin(),
-                        cover.m_NodeMemberships[neighbor].end(),
-                        std::inserter(intersection, intersection.begin()));
+                    cover.m_NodeMemberships[i].end(),
+                    cover.m_NodeMemberships[neighbor].begin(),
+                    cover.m_NodeMemberships[neighbor].end(),
+                    std::inserter(intersection, intersection.begin()));
                 long intersectionSize = static_cast<long>(intersection.size());
-                din += static_cast<long>(intersectionSize > 0);
+                if (intersectionSize > 0) {
+                    din++;
+                    for (long n : intersection) {
+                        cover.m_CommunityStats[n].m_InDegree++;
+                    }
+                }
+                else {
+                    for (long n : cover.m_NodeMemberships[i]) {
+                        cover.m_CommunityStats[n].m_OutDegree++;
+                    }
+                }
                 dinPrima += intersectionSize;
                 cover.m_Weights[graph.GetEdgeIndex(i,j)] = intersectionSize;
             }
@@ -308,7 +321,6 @@ namespace triforce {
 
 
     double TestMerge( const Cover& cover, const long communityId1, const long communityId2, double alpha, double overlap ) {
-
         const Graph& graph = *cover.m_Graph;
         const std::set<long>& community1 = *cover.m_Communities[communityId1];
         const std::set<long>& community2 = *cover.m_Communities[communityId2];
@@ -360,6 +372,18 @@ namespace triforce {
     static bool CompareCommunityMerge( const CommunityMerge& a, const CommunityMerge& b ) {
         return a.m_Improvement < b.m_Improvement;
     }
+
+   struct CommunityRelation {
+       long m_CommunityId1;
+       long m_CommunityId2;
+       long m_Edges;
+
+/*       bool operator() (const CommunityRelation& a, const CommunityRelation& b) const
+       {
+           if( m_COmmunity 
+       }
+       */
+   };
 
     static void MergeCommunities( Cover& cover, double alpha, double overlapp ) {
         const Graph& graph = *cover.m_Graph;

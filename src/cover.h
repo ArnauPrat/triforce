@@ -34,12 +34,18 @@ namespace triforce {
        double   m_NotConnectedRemove;
    };
 
+   struct CommunityStats {
+       int  m_InDegree;
+       int  m_OutDegree;
+   };
+
    struct Cover {
        Graph*                           m_Graph;
        MembershipStats*                 m_MembershipStats;
        std::set<long>*                  m_NodeMemberships;
        long*                            m_Weights;
        std::vector<std::set<long>*>     m_Communities;
+       CommunityStats*                 m_CommunityStats;
    };
 
    Cover* Create( const Graph* graph );
