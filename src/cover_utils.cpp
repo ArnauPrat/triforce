@@ -27,6 +27,30 @@
 
 namespace triforce {
 
+   struct CommunityRelation {
+       long     m_CommunityId1;
+       long     m_CommunityId2;
+
+       bool operator() (const CommunityRelation& a, const CommunityRelation& b) const
+       {
+           if ( a.m_CommunityId1 < b.m_CommunityId1 ) return true;
+           if ( b.m_CommunityId1 < a.m_CommunityId1 ) return false;
+           return a.m_CommunityId2 < b.m_CommunityId2;
+       }
+   };
+
+   struct CommunityRelationStats {
+       long     m_Connected1;
+       long     m_Connected2;
+       long     m_DoutConnected1;
+       long     m_DoutConnected2;
+       long     m_DinConnected1;
+       long     m_DinConnected2;
+       long     m_Edges;
+   };
+
+   std::map<CommunityRelation, CommunityRelationStats, CommunityRelation>  communityRelations;
+
     static long MaxOverlap( long degree, double overlap ) {
        return static_cast<long>(std::floor(overlap*static_cast<double>(degree)) + 1);
     }
@@ -35,7 +59,7 @@ namespace triforce {
         double score = 0.0;
         for( long i = 0; i < cover.m_Graph->GetNumNodes(); ++i ) {
             score+=Score(cover,i,alpha,overlap); 
-            if(cover.m_NodeMemberships[i].size() > MaxOverlap(cover.m_Graph->GetDegree(i),overlap)  ) {
+            if(static_cast<long>(cover.m_NodeMemberships[i].size()) > MaxOverlap(cover.m_Graph->GetDegree(i),overlap)  ) {
                 std::cout << "ENTRA" << std::endl;
                 std::cout << i << " " << cover.m_NodeMemberships[i].size() << " " << cover.m_Graph->GetDegree(i) << std::endl;
                 return 0.0;
@@ -72,6 +96,9 @@ namespace triforce {
             for( long c : cover.m_NodeMemberships[i]) {
                 r+=static_cast<long>(cover.m_Communities[c]->size()-1);
             }
+
+            std::map<long, long> candidates;
+            std::map<long, long> inDegrees;
             long din = 0;
             long dinPrima = 0;
             const long* adjacencies = graph.GetNeighbors(i);
@@ -80,24 +107,78 @@ namespace triforce {
                 long neighbor = adjacencies[j];
                 std::set<long> intersection;
                 std::set_intersection(cover.m_NodeMemberships[i].begin(),
-                    cover.m_NodeMemberships[i].end(),
-                    cover.m_NodeMemberships[neighbor].begin(),
-                    cover.m_NodeMemberships[neighbor].end(),
-                    std::inserter(intersection, intersection.begin()));
+                        cover.m_NodeMemberships[i].end(),
+                        cover.m_NodeMemberships[neighbor].begin(),
+                        cover.m_NodeMemberships[neighbor].end(),
+                        std::inserter(intersection, intersection.begin()));
                 long intersectionSize = static_cast<long>(intersection.size());
+
                 if (intersectionSize > 0) {
                     din++;
-                    for (long n : intersection) {
-                        cover.m_CommunityStats[n].m_InDegree++;
+                }
+
+                for (long c : intersection) {
+                    auto p = inDegrees.insert(std::pair<long,long>(c,0));
+                    if (intersectionSize > 0) {
+                        cover.m_CommunityStats[c].m_InDegree++;
+                        (*p.first).second++;
                     }
                 }
-                else {
-                    for (long n : cover.m_NodeMemberships[i]) {
-                        cover.m_CommunityStats[n].m_OutDegree++;
+
+                if( intersectionSize == 0 ) {
+                    for (long c : cover.m_NodeMemberships[neighbor]) {
+                        auto p = candidates.insert(std::pair<long,long>(c,0));
+                        (*p.first).second++;
+                    }
+                }
+
+                for (long c : cover.m_NodeMemberships[i]) {
+                    if( intersection.find(c) == intersection.end()) {
+                        cover.m_CommunityStats[c].m_OutDegree++;
                     }
                 }
                 dinPrima += intersectionSize;
                 cover.m_Weights[graph.GetEdgeIndex(i,j)] = intersectionSize;
+            }
+
+            for( auto c : candidates ) {
+                for( long r : cover.m_NodeMemberships[i] ) {
+                    CommunityRelation rel;
+                    rel.m_CommunityId1 = std::min(c.first, r);
+                    rel.m_CommunityId2 = std::max(c.first, r);
+                    CommunityRelationStats stats;
+                    stats.m_Connected1 = 0;
+                    stats.m_Connected2 = 0;
+                    stats.m_DoutConnected1 = 0;
+                    stats.m_DoutConnected2 = 0;
+                    stats.m_DinConnected1 = 0;
+                    stats.m_DinConnected2 = 0;
+                    stats.m_Edges = 0;
+                    auto p = communityRelations.insert(std::pair<CommunityRelation,CommunityRelationStats>(rel,stats));
+                    auto ref = p.first;
+                    (*ref).second.m_Edges+=c.second;
+                    if( r == rel.m_CommunityId1 ) {
+                        (*ref).second.m_Connected1++;
+                        long inDegree = 0;
+                        auto p2 = inDegrees.find(r);
+                        if( p2 != inDegrees.end() ) {
+                            inDegree = (*p2).second;
+                        }
+                        (*ref).second.m_DinConnected1+= inDegree;
+                        (*ref).second.m_DoutConnected1+=cover.m_Graph->GetDegree(i) - inDegree;
+                    } else {
+                        (*ref).second.m_Connected2++;
+                        long inDegree = 0;
+                        auto p2 = inDegrees.find(r);
+                        if( p2 != inDegrees.end() ) {
+                            inDegree = (*p2).second;
+                        }
+                        (*ref).second.m_DinConnected2+= inDegree;
+                        (*ref).second.m_DoutConnected2+=cover.m_Graph->GetDegree(i) - inDegree;
+                    }
+
+                    assert(r!=c.first);
+                }
             }
 
             double denominator = graph.GetDegree(i) + alpha*( r - (dinPrima)) ;
@@ -236,7 +317,6 @@ namespace triforce {
         return increment;
     }
 
-
     static void PerformMovements( Cover& cover, const long nodeId, double alpha, double overlap, double bestScore, std::vector<Movement>& retRemoves, std::vector<Movement>& retInserts, std::vector<Movement>& retTransfers ) {
         std::vector<Movement> removes;
         const long* adjacencies = cover.m_Graph->GetNeighbors(nodeId);
@@ -257,28 +337,31 @@ namespace triforce {
         }
 
         std::vector<Movement> inserts;
-        std::set<long> candidates;
+        std::map<long, long> candidates;
         long degree = cover.m_Graph->GetDegree(nodeId);
         for( long i = 0; i < degree; ++i ) {
             long neighbor = adjacencies[i];
             for( long c : cover.m_NodeMemberships[neighbor] ) {
-                candidates.insert(c);
+                if( cover.m_NodeMemberships[nodeId].find(c) == cover.m_NodeMemberships[nodeId].end() ) {
+                    auto p = candidates.insert(std::pair<long,long>(c,0));
+                    (*p.first).second++;
+                }
             }
         }
 
-        for( long c : candidates ) {
-            double improvement = TestInsert(cover, nodeId, c, alpha, overlap);
+        for( auto c : candidates ) {
+            double improvement = TestInsert(cover, nodeId, c.first, alpha, overlap);
             if( improvement > 0.0 ) {
                 if( inserts.size() == 0 ) {
                     Movement movement;
                     movement.m_Type = E_INSERT;
                     movement.m_NodeId = nodeId;
-                    movement.m_CommunityId1 = c;
+                    movement.m_CommunityId1 = c.first;
                     movement.m_Improvement = improvement;
                     inserts.push_back(movement);
                 } else if( inserts[0].m_Improvement < improvement ) {
                     inserts[0].m_NodeId = nodeId;
-                    inserts[0].m_CommunityId1 = c;
+                    inserts[0].m_CommunityId1 = c.first;
                     inserts[0].m_Improvement = improvement;
                 }
             }
@@ -288,21 +371,21 @@ namespace triforce {
         std::sort(inserts.begin(), inserts.end(), CompareMovement);
         long rindex = 0, iindex = 0;
         long slots = MaxOverlap(degree,overlap) - static_cast<long>(cover.m_NodeMemberships[nodeId].size());
-        while( ( (rindex < removes.size()) && (removes[rindex].m_Improvement != 0.0)) || (iindex < inserts.size() && (inserts[iindex].m_Improvement != 0.0))) {
+        while( ( (rindex < static_cast<long>(removes.size())) && (removes[rindex].m_Improvement != 0.0)) || (iindex < static_cast<long>(inserts.size()) && (inserts[iindex].m_Improvement != 0.0))) {
             bool movementFound = false;
-            if( rindex < removes.size() && removes[rindex].m_Improvement > 0.0 ) {
+            if( rindex < static_cast<long>(removes.size()) && removes[rindex].m_Improvement > 0.0 ) {
                 retRemoves.push_back(removes[rindex]);
                 movementFound = true;
                 rindex++;
                 slots++;
             }
-            if( iindex < inserts.size() ) {
+            if( iindex < static_cast<long>(inserts.size()) ) {
                 if( slots > 0 && inserts[iindex].m_Improvement > 0.0 ) {
                     retInserts.push_back(inserts[iindex]);
                     movementFound = true;
                     iindex++;
                     slots--;
-                } else if ( (rindex < removes.size()) && (inserts[iindex].m_Improvement > 0.0) && (removes[rindex].m_Improvement <= 0.0) &&
+                } else if ( (rindex < static_cast<long>(removes.size())) && (inserts[iindex].m_Improvement > 0.0) && (removes[rindex].m_Improvement <= 0.0) &&
                             (inserts[iindex].m_Improvement + removes[rindex].m_Improvement) > 0.0 ) {
                     Movement movement;
                     movement.m_Type = E_TRANSFER;
@@ -374,70 +457,84 @@ namespace triforce {
         return a.m_Improvement < b.m_Improvement;
     }
 
-   struct CommunityRelation {
-       long m_CommunityId1;
-       long m_CommunityId2;
-       bool operator() (const CommunityRelation& a, const CommunityRelation& b) const
-       {
-           if ( a.m_CommunityId1 < b.m_CommunityId1) return true;
-           if (b.m_CommunityId1 < a.m_CommunityId1) return false;
-           return a.m_CommunityId2 < b.m_CommunityId2;
-       }
-   };
 
-   bool TryMerge(const Cover& cover, long c1, long c2, long d, double alpha) {
-       double r1 = cover.m_Communities[c1]->size();
-       double r2 = cover.m_Communities[c2]->size();
-       double din1 = cover.m_CommunityStats[c1].m_InDegree/2.0;
-       double din2 = cover.m_CommunityStats[c2].m_InDegree/2.0;
-       double dout1 = cover.m_CommunityStats[c1].m_OutDegree; 
-       double dout2 = cover.m_CommunityStats[c2].m_OutDegree; 
-       double before = r1*(din1 / r1) / ( (din1+dout1+d)/r1 + alpha*(r1-1-(din1/r1))) + r2*(din2 / r2) / ( (din2+dout2+d)/r2 + alpha*(r2-1-(din2/r2)));
-       double after =   r1*((din1 + d) / r1) / ( (din1+dout1+d)/r1 + alpha*(r1+r2-1-((din1+d)/r1))) + 
-                        r2*((din2 + d) / r2) / ( (din2+dout2+d)/r2 + alpha*(r1+r2-1-((din2+d)/r2)));
-       return after > before;
+   double TryMerge(const Cover& cover, const CommunityRelation& rel, const CommunityRelationStats& stats, double alpha) {
+       double r1 = cover.m_Communities[rel.m_CommunityId1]->size();
+       double r2 = cover.m_Communities[rel.m_CommunityId2]->size();
+       double numConnected1 = stats.m_Connected1;
+       double numConnected2 = stats.m_Connected2;
+       double numNotConnected1 = r1 - numConnected1;
+       double numNotConnected2 = r2 - numConnected2;
+       double dinConnected1 = stats.m_DinConnected1 / numConnected1;
+       double dinConnected2 = stats.m_DinConnected2 / numConnected2;
+       double dinNotConnected1 = numNotConnected1 > 0 ? (cover.m_CommunityStats[rel.m_CommunityId1].m_InDegree - stats.m_DinConnected1) / numNotConnected1 : 0; 
+       double dinNotConnected2 = numNotConnected2 > 0 ? (cover.m_CommunityStats[rel.m_CommunityId2].m_InDegree - stats.m_DinConnected2) / numNotConnected2 : 0; 
+       double d1 = stats.m_Edges/(numConnected1*2.0f);
+       double d2 = stats.m_Edges/(numConnected2*2.0f);
+       double doutConnected1 = numConnected1 > 0 ? stats.m_DoutConnected1/numConnected1 : 0; 
+       double doutConnected2 = numConnected2 > 0 ? stats.m_DoutConnected2/numConnected2 : 0; 
+       double doutNotConnected1 = numNotConnected1 > 0 ? (cover.m_CommunityStats[rel.m_CommunityId1].m_OutDegree - stats.m_DoutConnected1)/numNotConnected1 : 0; 
+       double doutNotConnected2 = numNotConnected2 > 0 ? (cover.m_CommunityStats[rel.m_CommunityId2].m_OutDegree - stats.m_DoutConnected1)/numNotConnected2 : 0; 
+
+       double before = numNotConnected1*( dinNotConnected1 / (dinNotConnected1+doutNotConnected1+alpha*(r1-1-dinNotConnected1))) + 
+                       numNotConnected2*( dinNotConnected2 / (dinNotConnected2+doutNotConnected2+alpha*(r2-1-dinNotConnected2))) +
+                       numConnected1*( dinConnected1 / (dinConnected1+doutConnected1+alpha*(r1-1-dinConnected1))) + 
+                       numConnected2*( dinConnected2 / (dinConnected2+doutConnected2+alpha*(r2-1-dinConnected2)));
+
+       double after =  numNotConnected1*( dinNotConnected1 / (dinNotConnected1+doutNotConnected1+alpha*(r1+r2-1-dinNotConnected1))) + 
+                       numNotConnected2*( dinNotConnected2 / (dinNotConnected2+doutNotConnected2+alpha*(r1+r2-1-dinNotConnected2))) +
+                       numConnected1*( (dinConnected1+d1) / (dinConnected1+doutConnected1+alpha*(r1+r2-1-dinConnected1-d1))) + 
+                       numConnected2*( (dinConnected2+d2) / (dinConnected2+doutConnected2+alpha*(r1+r2-1-dinConnected2-d2)));
+
+       double res = after - before;
+       /*if( res > 0.0 ) {
+           std::cout << "r1: " << r1 << std::endl;
+           std::cout << "r2: " << r2 << std::endl;
+           std::cout << "numConnected1: " << numConnected1 << std::endl;
+           std::cout << "numConnected2: " << numConnected2 << std::endl;
+           std::cout << "numNotConnected1: " << numNotConnected1 << std::endl;
+           std::cout << "numNotConnected2: " << numNotConnected2 << std::endl;
+           std::cout << "dinConnected1: " << dinConnected1 << std::endl;
+           std::cout << "dinConnected2: " << dinConnected2 << std::endl;
+           std::cout << "dinNotConnected1: " << dinNotConnected1 << std::endl;
+           std::cout << "dinNotConnected2: " << dinNotConnected2 << std::endl;
+           std::cout << "d1: " << d1 << std::endl;
+           std::cout << "d2: " << d2 << std::endl;
+           std::cout << "doutConnected1: " << doutConnected1 << std::endl;
+           std::cout << "doutConnected2: " << doutConnected2 << std::endl;
+           std::cout << "doutNotConnected1: " << doutNotConnected1 << std::endl;
+           std::cout << "doutNotConnected2: " << doutNotConnected2 << std::endl;
+
+           std::cout << "Community1:";
+           for( long c : *cover.m_Communities[rel.m_CommunityId1] ) {
+               std::cout << " " << cover.m_Graph->ReMap(c);
+           }
+           std::cout << std::endl;
+
+           std::cout << "Community2:";
+           for( long c : *cover.m_Communities[rel.m_CommunityId2] ) {
+               std::cout << " " << cover.m_Graph->ReMap(c);
+           }
+           std::cout << std::endl;
+       }*/
+       return  res;
    }
 
     static void MergeCommunities( Cover& cover, double alpha, double overlapp ) {
-        const Graph& graph = *cover.m_Graph;
-        std::map<CommunityRelation, long, CommunityRelation > mergeTries;
-        long numNodes = graph.GetNumNodes();
-        for( long i = 0; i < numNodes; ++i ) {
-            const std::set<long>& communities = cover.m_NodeMemberships[i];
-            const long* adjacencies = graph.GetNeighbors(i);
-            long degree = graph.GetDegree(i);
-            for( long j = 0; j < degree; ++j ) {
-                long neighbor = adjacencies[j];
-                if( i < neighbor ) {
-                    const std::set<long>& nCommunities = cover.m_NodeMemberships[neighbor];
-                    for( auto it = communities.begin(); it != communities.end(); ++it ) {
-                        for( auto it2 = nCommunities.begin(); it2 != nCommunities.end(); ++it2 ) {
-                            if(*it != *it2 ) {
-                                CommunityRelation rel;
-                                rel.m_CommunityId1 = std::min(*it, *it2);
-                                rel.m_CommunityId2 = std::max(*it, *it2);
-                                auto p = mergeTries.insert(std::pair<CommunityRelation,long>(rel,0));
-                                auto ref = p.first;
-                                (*ref).second++;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         long filtered = 0;
         long total = 0;
         long improved = 0;
         std::vector<CommunityMerge> merges;
-        for( auto rel : mergeTries ) {
+        for( auto rel : communityRelations ) {
             long c1 = rel.first.m_CommunityId1;
             long c2 = rel.first.m_CommunityId2;
             if( cover.m_Communities[c1]->size() != 0 && cover.m_Communities[c2]->size() != 0 ) {
                 total++;
-                if (TryMerge(cover, c1, c2, rel.second, alpha)) {
-                    double improvement = TestMerge(cover, c1, c2, alpha, overlapp);
+                double improvement = TryMerge(cover, rel.first, rel.second, alpha) ;
+                if( improvement > 0.0 ) {
+                    improvement = TestMerge(cover, c1, c2, alpha, overlapp);
                     if (improvement > 0.0) {
+//                        std::cout << "IMPROVED" << std::endl;
                         CommunityMerge merge;
                         merge.m_CommunityId1 = c1;
                         merge.m_CommunityId2 = c2;
@@ -474,7 +571,6 @@ namespace triforce {
     }
 
     void RefineCommunities( Cover& cover, double alpha, double overlap ) {
-        long bestCoverSize = 0;
         Cover* bestCover = Create(cover.m_Graph);
         Copy(*bestCover, cover);
         double bestScore = Score(*bestCover, alpha, overlap );
@@ -483,6 +579,7 @@ namespace triforce {
         int lookahead = LOOKAHEAD;
         while(lookahead > 0) {
             lookahead--;
+            communityRelations.clear();
             std::cout << "Starting Iteration" << std::endl;
             std::vector<Movement> removes;
             std::vector<Movement> inserts;
@@ -508,7 +605,7 @@ namespace triforce {
             }
 
             std::list<long> slots;
-            for( int i = 0; i < cover.m_Communities.size(); ++i ) {
+            for( int i = 0; i < static_cast<int>(cover.m_Communities.size()); ++i ) {
                 if( cover.m_Communities[i]->size() == 0 ) {
                     slots.push_back(i);
                 }

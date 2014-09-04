@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef COVER_H
 #define COVER_H
 
-#include "sparse_matrix.h"
 #include "graph.h"
 #include <set>
 #include <vector>
@@ -39,13 +38,14 @@ namespace triforce {
        int  m_OutDegree;
    };
 
+
    struct Cover {
        Graph*                           m_Graph;
        MembershipStats*                 m_MembershipStats;
        std::set<long>*                  m_NodeMemberships;
        long*                            m_Weights;
        std::vector<std::set<long>*>     m_Communities;
-       CommunityStats*                 m_CommunityStats;
+       CommunityStats*                  m_CommunityStats;
    };
 
    Cover* Create( const Graph* graph );
