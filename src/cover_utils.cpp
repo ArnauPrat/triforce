@@ -115,14 +115,12 @@ namespace triforce {
 
                 if (intersectionSize > 0) {
                     din++;
-                }
-
-                for (long c : intersection) {
-                    auto p = inDegrees.insert(std::pair<long,long>(c,0));
-                    if (intersectionSize > 0) {
+                    for (long c : intersection) {
+                        auto p = inDegrees.insert(std::pair<long,long>(c,0));
                         cover.m_CommunityStats[c].m_InDegree++;
                         (*p.first).second++;
                     }
+
                 }
 
                 if( intersectionSize == 0 ) {
@@ -487,7 +485,7 @@ namespace triforce {
                        numConnected2*( (dinConnected2+d2) / (dinConnected2+doutConnected2+alpha*(r1+r2-1-dinConnected2-d2)));
 
        double res = after - before;
-       /*if( res > 0.0 ) {
+       if( res > 0.0 ) {
            std::cout << "r1: " << r1 << std::endl;
            std::cout << "r2: " << r2 << std::endl;
            std::cout << "numConnected1: " << numConnected1 << std::endl;
@@ -516,7 +514,7 @@ namespace triforce {
                std::cout << " " << cover.m_Graph->ReMap(c);
            }
            std::cout << std::endl;
-       }*/
+       }
        return  res;
    }
 
@@ -534,7 +532,7 @@ namespace triforce {
                 if( improvement > 0.0 ) {
                     improvement = TestMerge(cover, c1, c2, alpha, overlapp);
                     if (improvement > 0.0) {
-//                        std::cout << "IMPROVED" << std::endl;
+                        std::cout << "IMPROVED" << std::endl;
                         CommunityMerge merge;
                         merge.m_CommunityId1 = c1;
                         merge.m_CommunityId2 = c2;
@@ -640,7 +638,7 @@ namespace triforce {
                 std::cout << "New Score after merging " << currentScore << std::endl;
                 diff = currentScore - bestScore;
             } 
-            
+
             if( diff > 0.001) {
                 std::cout << "Cover Improved" << std::endl;
                 Destroy(bestCover);
