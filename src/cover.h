@@ -36,6 +36,10 @@ namespace triforce {
    struct CommunityStats {
        int  m_InDegree;
        int  m_OutDegree;
+       int  m_Din;
+       int  m_DinPrima;
+       int  m_R;
+       double  m_Score;
    };
 
 

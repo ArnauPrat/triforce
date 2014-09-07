@@ -40,7 +40,7 @@ namespace triforce {
         }
 
         dest.m_Communities.clear();
-        for( int i = 0; i < src.m_Communities.size(); ++i ) {
+        for( int i = 0; i < static_cast<int>(src.m_Communities.size()); ++i ) {
             dest.m_Communities.push_back( new std::set<long>(*src.m_Communities[i]));
         }
 
@@ -59,7 +59,7 @@ namespace triforce {
         delete [] cover->m_MembershipStats;
         delete [] cover->m_NodeMemberships;
         delete [] cover->m_Weights;
-        for( int i = 0; i < cover->m_Communities.size(); ++i ) {
+        for( int i = 0; i < static_cast<int>(cover->m_Communities.size()); ++i ) {
             delete cover->m_Communities[i];
         }
         if (cover->m_CommunityStats) {
