@@ -433,7 +433,7 @@ namespace triforce {
             before += cover.m_MembershipStats[nodeId1].m_Score;
             after += newScore;
         }
-//        std::cout << "improvement real: " << after << " " << before << std::endl;
+        std::cout << "improvement real: " << after << " " << before << std::endl;
         return improvement;
     }
 
@@ -464,18 +464,19 @@ namespace triforce {
        double dinPrima2 = cover.m_CommunityStats[rel.m_CommunityId2].m_DinPrima/r2;
        double R2 = cover.m_CommunityStats[rel.m_CommunityId2].m_R/r2;
 
-       /*double before = r1*( din1 / (degree1+alpha*(R1-dinPrima1))) + 
-                       r2*( din2 / (degree2+alpha*(R2-dinPrima2)));
-                       */
-       double before1 = cover.m_CommunityStats[rel.m_CommunityId1].m_Score;
+       double before1 = r1*( din1 / (degree1+alpha*(R1-dinPrima1)));
+       double before2 = r2*( din2 / (degree2+alpha*(R2-dinPrima2)));
+
+       /*double before1 = cover.m_CommunityStats[rel.m_CommunityId1].m_Score;
        double before2 = cover.m_CommunityStats[rel.m_CommunityId2].m_Score;
+       */
 
        double after1 =  r1*( (din1 + d1) / (degree1+alpha*(R1+r2-dinPrima1-d1))); 
        double after2 =  r2*( (din2 + d2) / (degree2+alpha*(R2+r1-dinPrima2-d2)));
 
        double res = after1 + after2 - before1 - before2;
 
-       /*if( res > 0.0 ) {
+       if( res > 0.0 ) {
            std::cout << "r1: " << r1 << std::endl;
            std::cout << "r2: " << r2 << std::endl;
            std::cout << "connected1: " << stats.m_NumConnected1 << std::endl;
@@ -494,6 +495,8 @@ namespace triforce {
            std::cout << "before1: " << before1 << std::endl;
            std::cout << "after2: " << after2 << std::endl;
            std::cout << "before2: " << before2 << std::endl;
+           std::cout << "before1 real: " << cover.m_CommunityStats[rel.m_CommunityId1].m_Score << std::endl;
+           std::cout << "before2 real: " << cover.m_CommunityStats[rel.m_CommunityId2].m_Score << std::endl;
 
            std::cout << "Community1:";
            for( long c : *cover.m_Communities[rel.m_CommunityId1] ) {
@@ -506,20 +509,19 @@ namespace triforce {
                std::cout << " " << cover.m_Graph->ReMap(c);
            }
            std::cout << std::endl;
-           for( int i = 0; i < cover.m_Graph->GetNumNodes(); ++i ) {
+          /* for( int i = 0; i < cover.m_Graph->GetNumNodes(); ++i ) {
                std::cout << cover.m_Graph->ReMap(i) << " ";
                for( long c : cover.m_NodeMemberships[i] ) {
                    std::cout << c << " ";
                }
                std::cout << std::endl;
            }
-           std::cout << std::endl;
+           std::cout << std::endl;*/
        }
-       */
        return  res;
    }
 
-    static void MergeCommunities( Cover& cover, double alpha, double overlapp ) {
+    static void MergeCommunities( Cover& cover, double alpha, double overlap ) {
         long filtered = 0;
         long total = 0;
         long improved = 0;
@@ -531,7 +533,7 @@ namespace triforce {
                 total++;
                 double improvement = TryMerge(cover, rel.first, rel.second, alpha) ;
                 if( improvement > 0.0 ) {
-                    improvement = TestMerge(cover, c1, c2, alpha, overlapp);
+                    improvement = TestMerge(cover, c1, c2, alpha, overlap);
                     if (improvement > 0.0) {
 //                        std::cout << "IMPROVED" << std::endl;
                         CommunityMerge merge;
@@ -540,13 +542,13 @@ namespace triforce {
                         merge.m_Improvement = improvement;
                         merges.push_back(merge);
                         improved++;
-                    }/* else {
+                    } else {
                         std::ofstream outputFile;
                         outputFile.open("prova.dat");
                         Print(cover, outputFile);
                         outputFile.close();
                         exit(-1);
-                    }*/
+                    }
                 }
                 else {
                     filtered++;
