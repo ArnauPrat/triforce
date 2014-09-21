@@ -700,25 +700,24 @@ namespace triforce {
                 }
             }        
 
-            /*            Copy(cover,*bestCover);
+            Copy(cover,*bestCover);
 
-                          std::cout << "Movements did not improve, trying merges " << std::endl;
-                          MergeCommunities(cover, alpha, overlap);
-                          double currentScore = Score(cover, alpha, overlap );
-                          std::cout << "New Score after merging " << currentScore << std::endl;
-                          double diff = currentScore - bestScore;
-                          if( diff > 0.0) {
-                          std::cout << "Cover Improved" << std::endl;
-                          Destroy(bestCover);
-                          bestCover = Create(cover.m_Graph);
-                          Copy(*bestCover,cover);
-                          bestScore = currentScore;
-                          lookahead = LOOKAHEAD;
-                          if( diff > 0.01 ) {
-                          finish = false;
-                          }
-                          }
-                          */
+            std::cout << "Movements did not improve, trying merges " << std::endl;
+            MergeCommunities(cover, alpha, overlap);
+            double currentScore = Score(cover, alpha, overlap );
+            std::cout << "New Score after merging " << currentScore << std::endl;
+            double diff = currentScore - bestScore;
+            if( diff > 0.0) {
+                std::cout << "Cover Improved" << std::endl;
+                Destroy(bestCover);
+                bestCover = Create(cover.m_Graph);
+                Copy(*bestCover,cover);
+                bestScore = currentScore;
+                lookahead = LOOKAHEAD;
+                if( diff > 0.01 ) {
+                    finish = false;
+                }
+            }
         }
         Copy(cover,*bestCover);
     }
