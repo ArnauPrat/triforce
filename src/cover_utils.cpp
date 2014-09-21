@@ -28,27 +28,27 @@
 
 namespace triforce {
 
-   struct CommunityRelation {
-       long     m_CommunityId1;
-       long     m_CommunityId2;
+    struct CommunityRelation {
+        long     m_CommunityId1;
+        long     m_CommunityId2;
 
-       bool operator() (const CommunityRelation& a, const CommunityRelation& b) const
-       {
-           if ( a.m_CommunityId1 < b.m_CommunityId1 ) return true;
-           if ( b.m_CommunityId1 < a.m_CommunityId1 ) return false;
-           return a.m_CommunityId2 < b.m_CommunityId2;
-       }
-   };
+        bool operator() (const CommunityRelation& a, const CommunityRelation& b) const
+        {
+            if ( a.m_CommunityId1 < b.m_CommunityId1 ) return true;
+            if ( b.m_CommunityId1 < a.m_CommunityId1 ) return false;
+            return a.m_CommunityId2 < b.m_CommunityId2;
+        }
+    };
 
-   struct CommunityRelationStats {
-       long     m_Edges;
-       long     m_Edges2;
-   };
+    struct CommunityRelationStats {
+        long     m_Edges;
+        long     m_Edges2;
+    };
 
-   std::map<CommunityRelation, CommunityRelationStats, CommunityRelation>  communityRelations;
+    std::map<CommunityRelation, CommunityRelationStats, CommunityRelation>  communityRelations;
 
     static long MaxOverlap( long degree, double overlap ) {
-       return static_cast<long>(std::floor(overlap*static_cast<double>(degree)) + 1);
+        return static_cast<long>(std::floor(overlap*static_cast<double>(degree)) + 1);
     }
 
     double Score( const Cover& cover, double alpha, double overlap ) {
@@ -154,22 +154,22 @@ namespace triforce {
                 }
             }
 
-            double denominator = graph.GetDegree(i) + alpha*( r - (dinPrima)) ;
+            double denominator = graph.GetDegree(i) + alpha*( r - din ) ;
             cover.m_MembershipStats[i].m_Score = denominator > 0.0 ? din / denominator : 0.0;
 
-            denominator = graph.GetDegree(i) + alpha*( r+1 - (dinPrima+1)) ;
+            denominator = graph.GetDegree(i) + alpha*( r+1 - din - 1) ;
             cover.m_MembershipStats[i].m_ConnectedAdd = denominator > 0 ? (din+1) / denominator : 0.0;
             cover.m_MembershipStats[i].m_ConnectedAdd -= cover.m_MembershipStats[i].m_Score;
 
-            denominator = graph.GetDegree(i) + alpha*( r+1 - dinPrima) ;
+            denominator = graph.GetDegree(i) + alpha*( r+1 - din) ;
             cover.m_MembershipStats[i].m_NotConnectedAdd = denominator > 0 ? (din) / denominator : 0.0;
             cover.m_MembershipStats[i].m_NotConnectedAdd -= cover.m_MembershipStats[i].m_Score;
 
-            denominator = graph.GetDegree(i) + alpha*( r-1 - (dinPrima-1)) ;
+            denominator = graph.GetDegree(i) + alpha*( r-1 - din + 1) ;
             cover.m_MembershipStats[i].m_ConnectedRemove = denominator > 0 ? (din-1) / denominator : 0.0;
             cover.m_MembershipStats[i].m_ConnectedRemove -= cover.m_MembershipStats[i].m_Score;
 
-            denominator = graph.GetDegree(i) + alpha*( r-1 - dinPrima) ;
+            denominator = graph.GetDegree(i) + alpha*( r-1 - din ) ;
             cover.m_MembershipStats[i].m_NotConnectedRemove = denominator > 0 ? (din) / denominator : 0.0;
             cover.m_MembershipStats[i].m_NotConnectedRemove -= cover.m_MembershipStats[i].m_Score;
 
@@ -230,8 +230,8 @@ namespace triforce {
                 }   
             }   
         }   
-        
-       ComputeMembershipStats(cover, alpha);
+
+        ComputeMembershipStats(cover, alpha);
     }
 
     enum MovementType {
@@ -270,32 +270,34 @@ namespace triforce {
                 increment += cover.m_MembershipStats[n].m_NotConnectedRemove;
             }
         }
-        double denominator = cover.m_Graph->GetDegree(nodeId) + alpha*(cover.m_MembershipStats[nodeId].m_R - cover.m_Communities[community]->size() - (cover.m_MembershipStats[nodeId].m_DinPrima - dinPrimaLost));
+        double denominator = cover.m_Graph->GetDegree(nodeId) + 
+            alpha*(cover.m_MembershipStats[nodeId].m_R - cover.m_Communities[community]->size() - (cover.m_MembershipStats[nodeId].m_Din - dinLost));
         double newScore = denominator > 0 ? (cover.m_MembershipStats[nodeId].m_Din - dinLost) / denominator : 0.0;
         increment += newScore - cover.m_MembershipStats[nodeId].m_Score;
         return increment;
     }
 
     double TestInsert( const Cover& cover, const long nodeId, const long community, double alpha, double overlapp) {
-            double increment = 0.0;
-            long dinAdded = 0;
-            long dinPrimaAdded = 0;
-            for( long n : *cover.m_Communities[community] ) {
-                long pos = cover.m_Graph->HasNeighbor(nodeId,n);
-                if( pos != -1 ) {
-                    long edgeIndex = cover.m_Graph->GetEdgeIndex(nodeId, pos);
-                    if( cover.m_Weights[edgeIndex] == 0 ) {
-                        increment+=cover.m_MembershipStats[n].m_ConnectedAdd;
-                        dinAdded++;
-                    }
-                    dinPrimaAdded++;
-                } else {
-                    increment+=cover.m_MembershipStats[n].m_NotConnectedAdd;
+        double increment = 0.0;
+        long dinAdded = 0;
+        long dinPrimaAdded = 0;
+        for( long n : *cover.m_Communities[community] ) {
+            long pos = cover.m_Graph->HasNeighbor(nodeId,n);
+            if( pos != -1 ) {
+                long edgeIndex = cover.m_Graph->GetEdgeIndex(nodeId, pos);
+                if( cover.m_Weights[edgeIndex] == 0 ) {
+                    increment+=cover.m_MembershipStats[n].m_ConnectedAdd;
+                    dinAdded++;
                 }
+                dinPrimaAdded++;
+            } else {
+                increment+=cover.m_MembershipStats[n].m_NotConnectedAdd;
             }
-            double denominator = cover.m_Graph->GetDegree(nodeId) + alpha*(cover.m_MembershipStats[nodeId].m_R+cover.m_Communities[community]->size() - (cover.m_MembershipStats[nodeId].m_DinPrima + dinPrimaAdded));
-            double newScore = denominator > 0 ?  (cover.m_MembershipStats[nodeId].m_Din + dinAdded) / denominator : 0.0;
-            increment += newScore - cover.m_MembershipStats[nodeId].m_Score;
+        }
+        double denominator = cover.m_Graph->GetDegree(nodeId) + 
+            alpha*(cover.m_MembershipStats[nodeId].m_R+cover.m_Communities[community]->size() - (cover.m_MembershipStats[nodeId].m_Din + dinAdded));
+        double newScore = denominator > 0 ?  (cover.m_MembershipStats[nodeId].m_Din + dinAdded) / denominator : 0.0;
+        increment += newScore - cover.m_MembershipStats[nodeId].m_Score;
         return increment;
     }
 
@@ -332,19 +334,28 @@ namespace triforce {
         }
 
         for( auto c : candidates ) {
-            double improvement = TestInsert(cover, nodeId, c.first, alpha, overlap);
-            if( improvement > 0.0 ) {
-                if( inserts.size() == 0 ) {
-                    Movement movement;
-                    movement.m_Type = E_INSERT;
-                    movement.m_NodeId = nodeId;
-                    movement.m_CommunityId1 = c.first;
-                    movement.m_Improvement = improvement;
-                    inserts.push_back(movement);
-                } else if( inserts[0].m_Improvement < improvement ) {
-                    inserts[0].m_NodeId = nodeId;
-                    inserts[0].m_CommunityId1 = c.first;
-                    inserts[0].m_Improvement = improvement;
+            double r = cover.m_MembershipStats[nodeId].m_R;
+            double din = cover.m_MembershipStats[nodeId].m_Din;
+            double degree = cover.m_Graph->GetDegree(nodeId);
+            //            printf("%f %f %f %ld \n", din, r, degree, c.second);
+            double threshold = cover.m_Communities[c.first]->size()*alpha*din/(alpha*r+degree);
+            //           printf("%f \n", threshold);
+
+            if(  threshold <= c.second ) {
+                double improvement = TestInsert(cover, nodeId, c.first, alpha, overlap);
+                if( improvement > 0.0 ) {
+                    if( inserts.size() == 0 ) {
+                        Movement movement;
+                        movement.m_Type = E_INSERT;
+                        movement.m_NodeId = nodeId;
+                        movement.m_CommunityId1 = c.first;
+                        movement.m_Improvement = improvement;
+                        inserts.push_back(movement);
+                    } else if( inserts[0].m_Improvement < improvement ) {
+                        inserts[0].m_NodeId = nodeId;
+                        inserts[0].m_CommunityId1 = c.first;
+                        inserts[0].m_Improvement = improvement;
+                    }
                 }
             }
         }
@@ -368,7 +379,7 @@ namespace triforce {
                     iindex++;
                     slots--;
                 } else if ( (rindex < static_cast<long>(removes.size())) && (inserts[iindex].m_Improvement > 0.0) && (removes[rindex].m_Improvement <= 0.0) &&
-                            (inserts[iindex].m_Improvement + removes[rindex].m_Improvement) > 0.0 ) {
+                        (inserts[iindex].m_Improvement + removes[rindex].m_Improvement) > 0.0 ) {
                     Movement movement;
                     movement.m_Type = E_TRANSFER;
                     movement.m_NodeId = nodeId;
@@ -405,12 +416,12 @@ namespace triforce {
                     dinPrima++;
                 }
             }
-            double denominator = cover.m_Graph->GetDegree(nodeId1) + alpha*(cover.m_MembershipStats[nodeId1].m_R + cover.m_Communities[communityId2]->size() - (cover.m_MembershipStats[nodeId1].m_DinPrima + dinPrima));
+            double denominator = cover.m_Graph->GetDegree(nodeId1) + alpha*(cover.m_MembershipStats[nodeId1].m_R + cover.m_Communities[communityId2]->size() - (cover.m_MembershipStats[nodeId1].m_Din + din));
             double newScore = denominator > 0 ? (cover.m_MembershipStats[nodeId1].m_Din + din) / denominator : 0.0;
             improvement += newScore - cover.m_MembershipStats[nodeId1].m_Score;
             before += cover.m_MembershipStats[nodeId1].m_Score;
             after += newScore;
-           // std::cout << graph.ReMap(nodeId1) << " " << cover.m_MembershipStats[nodeId1].m_Din << " " << din << " " << graph.GetDegree(nodeId1) << " " << after - before << std::endl;
+            // std::cout << graph.ReMap(nodeId1) << " " << cover.m_MembershipStats[nodeId1].m_Din << " " << din << " " << graph.GetDegree(nodeId1) << " " << after - before << std::endl;
         }
 
 
@@ -434,7 +445,7 @@ namespace triforce {
             after += newScore;
             //std::cout << graph.ReMap(nodeId1) << " " << cover.m_MembershipStats[nodeId1].m_Din << " " << din << " " << graph.GetDegree(nodeId1) << " " << after - before << std::endl;
         }
-//        std::cout << "improvement real: " << after << " " << before << std::endl;
+        //        std::cout << "improvement real: " << after << " " << before << std::endl;
         return improvement;
     }
 
@@ -480,76 +491,72 @@ namespace triforce {
     }
 
 
-   double TryMerge(const Cover& cover, const CommunityRelation& rel, const CommunityRelationStats& stats, double alpha) {
-       double r1 = cover.m_Communities[rel.m_CommunityId1]->size();
-       double r2 = cover.m_Communities[rel.m_CommunityId2]->size();
-       double d1 = stats.m_Edges/(2.0*r1);
-       double d2 = stats.m_Edges/(2.0*r2);
-       double degree1 = (cover.m_CommunityStats[rel.m_CommunityId1].m_InDegree + cover.m_CommunityStats[rel.m_CommunityId1].m_OutDegree)/r1;
-       double degree2 = (cover.m_CommunityStats[rel.m_CommunityId2].m_InDegree + cover.m_CommunityStats[rel.m_CommunityId2].m_OutDegree)/r2;
+    double TryMerge(const Cover& cover, const CommunityRelation& rel, const CommunityRelationStats& stats, double alpha) {
+        double r1 = cover.m_Communities[rel.m_CommunityId1]->size();
+        double r2 = cover.m_Communities[rel.m_CommunityId2]->size();
+        double d1 = stats.m_Edges/(2.0*r1);
+        double d2 = stats.m_Edges/(2.0*r2);
+        double degree1 = (cover.m_CommunityStats[rel.m_CommunityId1].m_InDegree + cover.m_CommunityStats[rel.m_CommunityId1].m_OutDegree)/r1;
+        double degree2 = (cover.m_CommunityStats[rel.m_CommunityId2].m_InDegree + cover.m_CommunityStats[rel.m_CommunityId2].m_OutDegree)/r2;
 
-       double din1 = cover.m_CommunityStats[rel.m_CommunityId1].m_Din/r1;
-       double dinPrima1 = cover.m_CommunityStats[rel.m_CommunityId1].m_DinPrima/r1;
-       double R1 = cover.m_CommunityStats[rel.m_CommunityId1].m_R/r1;
+        double din1 = cover.m_CommunityStats[rel.m_CommunityId1].m_Din/r1;
+        double dinPrima1 = cover.m_CommunityStats[rel.m_CommunityId1].m_DinPrima/r1;
+        double R1 = cover.m_CommunityStats[rel.m_CommunityId1].m_R/r1;
 
-       double din2 = cover.m_CommunityStats[rel.m_CommunityId2].m_Din/r2;
-       double dinPrima2 = cover.m_CommunityStats[rel.m_CommunityId2].m_DinPrima/r2;
-       double R2 = cover.m_CommunityStats[rel.m_CommunityId2].m_R/r2;
+        double din2 = cover.m_CommunityStats[rel.m_CommunityId2].m_Din/r2;
+        double dinPrima2 = cover.m_CommunityStats[rel.m_CommunityId2].m_DinPrima/r2;
+        double R2 = cover.m_CommunityStats[rel.m_CommunityId2].m_R/r2;
 
-       double before1 = r1*( din1 / (degree1+alpha*(R1-dinPrima1)));
-       double before2 = r2*( din2 / (degree2+alpha*(R2-dinPrima2)));
+        double before1 = r1*( din1 / (degree1+alpha*(R1-din1)));
+        double before2 = r2*( din2 / (degree2+alpha*(R2-din2)));
 
-       /*double before1 = cover.m_CommunityStats[rel.m_CommunityId1].m_Score;
-       double before2 = cover.m_CommunityStats[rel.m_CommunityId2].m_Score;
-       */
+        double after1 =  r1*( (din1 + d1) / (degree1+alpha*(R1+r2-din1-d1))); 
+        double after2 =  r2*( (din2 + d2) / (degree2+alpha*(R2+r1-din2-d2)));
 
-       double after1 =  r1*( (din1 + d1) / (degree1+alpha*(R1+r2-dinPrima1-d1))); 
-       double after2 =  r2*( (din2 + d2) / (degree2+alpha*(R2+r1-dinPrima2-d2)));
+        double res = after1 + after2 - before1 - before2;
 
-       double res = after1 + after2 - before1 - before2;
+        if( res > 0.0 ) {
+            std::cout << "r1: " << r1 << std::endl;
+            std::cout << "r2: " << r2 << std::endl;
+            std::cout << "din1: " << din1 << std::endl;
+            std::cout << "din2: " << din2 << std::endl;
+            std::cout << "dinPrima1: " << din1 << std::endl;
+            std::cout << "dinPrima2: " << din2 << std::endl;
+            std::cout << "d1: " << d1 << std::endl;
+            std::cout << "d2: " << d2 << std::endl;
+            std::cout << "degree1: " << degree1 << std::endl;
+            std::cout << "degree2: " << degree2 << std::endl;
+            std::cout << "R1: " << R1 << std::endl;
+            std::cout << "R2: " << R2 << std::endl;
+            std::cout << "after1: " << after1 << std::endl;
+            std::cout << "before1: " << before1 << std::endl;
+            std::cout << "after2: " << after2 << std::endl;
+            std::cout << "before2: " << before2 << std::endl;
+            std::cout << "before1 real: " << cover.m_CommunityStats[rel.m_CommunityId1].m_Score << std::endl;
+            std::cout << "before2 real: " << cover.m_CommunityStats[rel.m_CommunityId2].m_Score << std::endl;
 
-       if( res > 0.0 ) {
-           std::cout << "r1: " << r1 << std::endl;
-           std::cout << "r2: " << r2 << std::endl;
-           std::cout << "din1: " << din1 << std::endl;
-           std::cout << "din2: " << din2 << std::endl;
-           std::cout << "dinPrima1: " << din1 << std::endl;
-           std::cout << "dinPrima2: " << din2 << std::endl;
-           std::cout << "d1: " << d1 << std::endl;
-           std::cout << "d2: " << d2 << std::endl;
-           std::cout << "degree1: " << degree1 << std::endl;
-           std::cout << "degree2: " << degree2 << std::endl;
-           std::cout << "R1: " << R1 << std::endl;
-           std::cout << "R2: " << R2 << std::endl;
-           std::cout << "after1: " << after1 << std::endl;
-           std::cout << "before1: " << before1 << std::endl;
-           std::cout << "after2: " << after2 << std::endl;
-           std::cout << "before2: " << before2 << std::endl;
-           std::cout << "before1 real: " << cover.m_CommunityStats[rel.m_CommunityId1].m_Score << std::endl;
-           std::cout << "before2 real: " << cover.m_CommunityStats[rel.m_CommunityId2].m_Score << std::endl;
+            std::cout << "Community1:";
+            for( long c : *cover.m_Communities[rel.m_CommunityId1] ) {
+                std::cout << " " << cover.m_Graph->ReMap(c);
+            }
+            std::cout << std::endl;
 
-           std::cout << "Community1:";
-           for( long c : *cover.m_Communities[rel.m_CommunityId1] ) {
-               std::cout << " " << cover.m_Graph->ReMap(c);
-           }
-           std::cout << std::endl;
-
-           std::cout << "Community2:";
-           for( long c : *cover.m_Communities[rel.m_CommunityId2] ) {
-               std::cout << " " << cover.m_Graph->ReMap(c);
-           }
-           std::cout << std::endl;
-          /* for( int i = 0; i < cover.m_Graph->GetNumNodes(); ++i ) {
+            std::cout << "Community2:";
+            for( long c : *cover.m_Communities[rel.m_CommunityId2] ) {
+                std::cout << " " << cover.m_Graph->ReMap(c);
+            }
+            std::cout << std::endl;
+            /* for( int i = 0; i < cover.m_Graph->GetNumNodes(); ++i ) {
                std::cout << cover.m_Graph->ReMap(i) << " ";
                for( long c : cover.m_NodeMemberships[i] ) {
-                   std::cout << c << " ";
+               std::cout << c << " ";
                }
                std::cout << std::endl;
-           }
-           std::cout << std::endl;*/
-       }
-       return  res;
-   }
+               }
+               std::cout << std::endl;*/
+        }
+        return  res;
+    }
 
     static void MergeCommunities( Cover& cover, double alpha, double overlap ) {
         long filtered = 0;
@@ -564,24 +571,24 @@ namespace triforce {
                 if( cover.m_Communities[rel.first.m_CommunityId1]->size() > 1 &&
                         cover.m_Communities[rel.first.m_CommunityId2]->size() > 1) {
                     double improvement = TryMerge(cover, rel.first, rel.second, alpha) ;
-//                   double improvement = TestMerge2(cover, c1, c2, rel.second.m_Edges, rel.second.m_Edges2,alpha, overlapp);
+                    //                   double improvement = TestMerge2(cover, c1, c2, rel.second.m_Edges, rel.second.m_Edges2,alpha, overlapp);
                     if( improvement > 0.0 ) {
                         improvement = TestMerge(cover, c1, c2, alpha, overlap);
                         if (improvement > 0.0) {
-//                                                    std::cout << "IMPROVED" << std::endl;
+                            //                                                    std::cout << "IMPROVED" << std::endl;
                             CommunityMerge merge;
                             merge.m_CommunityId1 = c1;
                             merge.m_CommunityId2 = c2;
                             merge.m_Improvement = improvement;
                             merges.push_back(merge);
                             improved++;
-                            } /*else {
+                        } /*else {
                             std::ofstream outputFile;
                             outputFile.open("prova.dat");
                             Print(cover, outputFile);
                             outputFile.close();
                             exit(-1);
-                        }*/
+                            }*/
                     }
                     else {
                         filtered++;
@@ -693,24 +700,25 @@ namespace triforce {
                 }
             }        
 
-            Copy(cover,*bestCover);
+            /*            Copy(cover,*bestCover);
 
-            std::cout << "Movements did not improve, trying merges " << std::endl;
-            MergeCommunities(cover, alpha, overlap);
-            double currentScore = Score(cover, alpha, overlap );
-            std::cout << "New Score after merging " << currentScore << std::endl;
-            double diff = currentScore - bestScore;
-            if( diff > 0.0) {
-                std::cout << "Cover Improved" << std::endl;
-                Destroy(bestCover);
-                bestCover = Create(cover.m_Graph);
-                Copy(*bestCover,cover);
-                bestScore = currentScore;
-                lookahead = LOOKAHEAD;
-                if( diff > 0.01 ) {
-                    finish = false;
-                }
-            }
+                          std::cout << "Movements did not improve, trying merges " << std::endl;
+                          MergeCommunities(cover, alpha, overlap);
+                          double currentScore = Score(cover, alpha, overlap );
+                          std::cout << "New Score after merging " << currentScore << std::endl;
+                          double diff = currentScore - bestScore;
+                          if( diff > 0.0) {
+                          std::cout << "Cover Improved" << std::endl;
+                          Destroy(bestCover);
+                          bestCover = Create(cover.m_Graph);
+                          Copy(*bestCover,cover);
+                          bestScore = currentScore;
+                          lookahead = LOOKAHEAD;
+                          if( diff > 0.01 ) {
+                          finish = false;
+                          }
+                          }
+                          */
         }
         Copy(cover,*bestCover);
     }
